@@ -1,11 +1,103 @@
+"use client"
+
+import React, { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Card, CardContent } from "@/components/ui/card"
-import { ArrowRight, Eye, MinusCircle, PlusCircle } from "lucide-react"
+import { Eye, Loader2 } from "lucide-react"
+import { HomeHeroCta } from "@/components/home-hero-cta"
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type LeaderboardEntry = {
+  rank: number
+  name: string
+  slug: string
+  category: { name: string; slug: string }
+  currentBid: number
+  currentBidFormatted: string
+  clickCount: number
+  websiteUrl: string
+  description: string | null
+  logoUrl: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+type Category = { id: string; name: string; slug: string }
+
+type Stats = { activeCount: number; totalClicks: number }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function formatClicks(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
+  return String(n)
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return "just now"
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 
 export default function Page() {
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [stats, setStats] = useState<Stats>({ activeCount: 0, totalClicks: 0 })
+  const [activeCategory, setActiveCategory] = useState<string | null>(null)
+  const [loadingBoard, setLoadingBoard] = useState(true)
+  const [loadingMeta, setLoadingMeta] = useState(true)
+
+  // Fetch categories + stats once
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/categories").then((r) => r.json()),
+      fetch("/api/stats").then((r) => r.json()),
+    ])
+      .then(([catData, statsData]) => {
+        setCategories(catData?.categories ?? [])
+        setStats({
+          activeCount: statsData?.activeCount ?? 0,
+          totalClicks: statsData?.totalClicks ?? 0,
+        })
+      })
+      .catch(console.error)
+      .finally(() => setLoadingMeta(false))
+  }, [])
+
+  // Fetch leaderboard (re-runs when category filter changes)
+  const fetchLeaderboard = useCallback((categorySlug: string | null) => {
+    setLoadingBoard(true)
+    const url = categorySlug
+      ? `/api/leaderboard?category=${categorySlug}`
+      : "/api/leaderboard"
+    fetch(url)
+      .then((r) => r.json())
+      .then((data) => setLeaderboard(data?.leaderboard ?? []))
+      .catch(console.error)
+      .finally(() => setLoadingBoard(false))
+  }, [])
+
+  useEffect(() => {
+    fetchLeaderboard(activeCategory)
+  }, [activeCategory, fetchLeaderboard])
+
+  const top3 = leaderboard.slice(0, 3)
+
   return (
     <div className="flex min-h-screen flex-col bg-[#fafafa] font-sans">
       {/* Header */}
@@ -14,9 +106,11 @@ export default function Page() {
         <div className="hidden text-xs font-semibold tracking-widest text-muted-foreground uppercase md:block">
           How it works
         </div>
-        <Button className="rounded-none bg-black px-6 font-bold text-white hover:bg-black/90">
-          LAUNCH
-        </Button>
+        <div className="flex items-center gap-4">
+          <Button className="rounded-none bg-black px-6 font-bold text-white hover:bg-black/90">
+            LAUNCH
+          </Button>
+        </div>
       </header>
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-8 pb-24 md:px-8">
@@ -24,9 +118,15 @@ export default function Page() {
         <div className="mb-16 flex justify-center">
           <div className="flex items-center gap-4 rounded-full border bg-white px-6 py-2 shadow-sm">
             <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
               <div className="flex flex-col">
-                <span className="text-sm leading-none font-bold">24</span>
+                <span className="text-sm leading-none font-bold">
+                  {loadingMeta ? (
+                    <span className="inline-block h-3 w-6 animate-pulse rounded bg-muted" />
+                  ) : (
+                    stats.activeCount
+                  )}
+                </span>
                 <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
                   Active
                 </span>
@@ -36,7 +136,13 @@ export default function Page() {
             <div className="flex items-center gap-2">
               <Eye className="h-4 w-4 text-muted-foreground" />
               <div className="flex flex-col">
-                <span className="text-sm leading-none font-bold">12k</span>
+                <span className="text-sm leading-none font-bold">
+                  {loadingMeta ? (
+                    <span className="inline-block h-3 w-8 animate-pulse rounded bg-muted" />
+                  ) : (
+                    formatClicks(stats.totalClicks)
+                  )}
+                </span>
                 <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
                   Visits
                 </span>
@@ -46,273 +152,207 @@ export default function Page() {
         </div>
 
         {/* Hero Section */}
-        <div className="mb-24 grid grid-cols-1 gap-16 lg:grid-cols-2">
-          <div className="flex flex-col justify-center">
-            <h1 className="mb-6 text-5xl leading-[1.1] font-black tracking-tighter text-black lg:text-6xl">
-              YOUR STARTUP
-              <br />
-              DESERVES THE
-              <br />
-              ATTENTION.
-            </h1>
-            <p className="mb-8 max-w-md text-lg text-muted-foreground">
-              The internet's live leaderboard where startups compete for the top
-              spot.
-            </p>
-            <div className="flex w-full max-w-md items-center">
-              <Input
-                type="text"
-                placeholder="Enter your startup URL..."
-                className="h-12 rounded-none border-r-0 bg-white focus-visible:ring-0 focus-visible:ring-offset-0"
-              />
-              <Button className="h-12 rounded-none bg-black px-6 font-bold whitespace-nowrap text-white hover:bg-black/90">
-                CLAIM YOUR SPOT <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+        <div className="mb-12 grid grid-cols-1 gap-12 lg:grid-cols-2">
+          <HomeHeroCta />
 
-          <div className="flex flex-col gap-6">
-            <Card className="overflow-hidden rounded-sm border-2 border-orange-500 bg-white shadow-sm">
-              <CardContent className="flex flex-col items-center justify-center p-8 text-center">
-                <div className="mb-4 text-xs font-black tracking-widest text-black uppercase">
-                  GET #1 SPOT FOR
-                </div>
-                <div className="flex items-center gap-4">
-                  <MinusCircle className="h-6 w-6 cursor-pointer text-black" />
-                  <div className="text-6xl font-black tracking-tighter text-orange-500">
-                    $240
-                  </div>
-                  <PlusCircle className="h-6 w-6 cursor-pointer text-black" />
-                </div>
-              </CardContent>
-            </Card>
-
+          {/* Mini Leaderboard — top 3 from DB */}
+          <div className="flex flex-col">
             <Card className="rounded-sm bg-white shadow-sm">
               <div className="flex items-center justify-between border-b p-4">
                 <span className="text-[10px] font-black tracking-widest text-muted-foreground uppercase">
                   LEADERBOARD
                 </span>
                 <span className="flex items-center gap-1 text-[10px] font-black tracking-widest text-red-500 uppercase">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500"></span>{" "}
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />{" "}
                   LIVE NOW
                 </span>
               </div>
               <CardContent className="p-0">
-                <div className="flex flex-col">
-                  {/* Leaderboard Item 1 */}
-                  <div className="flex items-center justify-between border-b p-4 transition-colors hover:bg-muted/50">
-                    <div className="flex items-center gap-4">
-                      <span className="text-3xl font-black text-black italic">
-                        #1
-                      </span>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold text-black">
-                            Neon
-                          </span>
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-[8px] font-bold tracking-wider text-muted-foreground uppercase">
-                            DEV INFRA
-                          </span>
+                {loadingBoard ? (
+                  <div className="flex flex-col">
+                    {[1, 2, 3].map((i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between border-b p-4 last:border-0"
+                      >
+                        <div className="flex items-center gap-4">
+                          <span className="h-8 w-8 animate-pulse rounded bg-muted" />
+                          <div className="flex flex-col gap-1">
+                            <span className="h-4 w-24 animate-pulse rounded bg-muted" />
+                            <span className="h-2 w-16 animate-pulse rounded bg-muted" />
+                          </div>
                         </div>
-                        <div className="text-[10px] font-medium text-muted-foreground">
-                          40 min ago • 1.2k clicks
-                        </div>
+                        <span className="h-6 w-12 animate-pulse rounded bg-muted" />
                       </div>
-                    </div>
-                    <span className="text-2xl font-black text-orange-500">
-                      $247
-                    </span>
+                    ))}
                   </div>
-                  {/* Leaderboard Item 2 */}
-                  <div className="flex items-center justify-between border-b p-4 transition-colors hover:bg-muted/50">
-                    <div className="flex items-center gap-4">
-                      <span className="text-3xl font-black text-muted-foreground italic">
-                        #2
-                      </span>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold text-black">
-                            Cursor
+                ) : top3.length === 0 ? (
+                  <div className="p-8 text-center text-sm text-muted-foreground">
+                    No entries yet — be the first to claim a spot!
+                  </div>
+                ) : (
+                  <div className="flex flex-col">
+                    {top3.map((entry, idx) => (
+                      <div
+                        key={entry.slug}
+                        className={`flex items-center justify-between p-4 transition-colors hover:bg-muted/50 ${idx < top3.length - 1 ? "border-b" : ""}`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <span
+                            className={`text-3xl font-black italic ${entry.rank === 1 ? "text-black" : "text-muted-foreground"}`}
+                          >
+                            #{entry.rank}
                           </span>
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-[8px] font-bold tracking-wider text-muted-foreground uppercase">
-                            AI CODING
-                          </span>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg font-bold text-black">
+                                {entry.name}
+                              </span>
+                              <span className="rounded bg-muted px-1.5 py-0.5 text-[8px] font-bold tracking-wider text-muted-foreground uppercase">
+                                {entry.category.name}
+                              </span>
+                            </div>
+                            <div className="text-[10px] font-medium text-muted-foreground">
+                              {timeAgo(entry.updatedAt)} •{" "}
+                              {formatClicks(entry.clickCount)} clicks
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-[10px] font-medium text-muted-foreground">
-                          40 min ago • 1.2k clicks
-                        </div>
+                        <span className="text-2xl font-black text-orange-500">
+                          {entry.currentBidFormatted}
+                        </span>
                       </div>
-                    </div>
-                    <span className="text-2xl font-black text-orange-500">
-                      $183
-                    </span>
+                    ))}
                   </div>
-                  {/* Leaderboard Item 3 */}
-                  <div className="flex items-center justify-between p-4 transition-colors hover:bg-muted/50">
-                    <div className="flex items-center gap-4">
-                      <span className="text-3xl font-black text-muted-foreground italic">
-                        #3
-                      </span>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold text-black">
-                            Resend
-                          </span>
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-[8px] font-bold tracking-wider text-muted-foreground uppercase">
-                            DEV TOOLS
-                          </span>
-                        </div>
-                        <div className="text-[10px] font-medium text-muted-foreground">
-                          40 min ago • 1.2k clicks
-                        </div>
-                      </div>
-                    </div>
-                    <span className="text-2xl font-black text-orange-500">
-                      $129
-                    </span>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </div>
         </div>
 
-        <Separator className="mb-12" />
+        <Separator className="mb-8" />
 
         {/* Explore Section */}
-        <div className="mb-10 flex flex-col justify-between gap-6 md:flex-row md:items-center">
+        <div className="mb-8 flex flex-col justify-between gap-6 md:flex-row md:items-center">
           <h2 className="text-3xl font-black tracking-tighter text-black">
             EXPLORE
           </h2>
           <div className="flex flex-wrap gap-2">
+            {/* ALL filter */}
             <Badge
-              variant="default"
-              className="rounded-full border border-black bg-black px-4 py-1 text-xs font-bold text-white hover:bg-black/90"
+              id="filter-all"
+              onClick={() => setActiveCategory(null)}
+              variant={activeCategory === null ? "default" : "outline"}
+              className={`cursor-pointer rounded-full px-4 py-1 text-xs font-bold ${
+                activeCategory === null
+                  ? "border border-black bg-black text-white hover:bg-black/90"
+                  : "bg-white text-muted-foreground hover:bg-muted"
+              }`}
             >
               ALL
             </Badge>
-            <Badge
-              variant="outline"
-              className="rounded-full bg-white px-4 py-1 text-xs font-bold text-muted-foreground"
-            >
-              AI
-            </Badge>
-            <Badge
-              variant="outline"
-              className="rounded-full bg-white px-4 py-1 text-xs font-bold tracking-wider text-muted-foreground uppercase"
-            >
-              DEVELOPER TOOLS
-            </Badge>
-            <Badge
-              variant="outline"
-              className="rounded-full bg-white px-4 py-1 text-xs font-bold tracking-wider text-muted-foreground uppercase"
-            >
-              SAAS
-            </Badge>
-            <Badge
-              variant="outline"
-              className="rounded-full bg-white px-4 py-1 text-xs font-bold tracking-wider text-muted-foreground uppercase"
-            >
-              STARTUPS
-            </Badge>
-            <Badge
-              variant="outline"
-              className="rounded-full bg-white px-4 py-1 text-xs font-bold tracking-wider text-muted-foreground uppercase"
-            >
-              INDIE
-            </Badge>
+            {/* Dynamic categories from DB */}
+            {loadingMeta
+              ? [1, 2, 3].map((i) => (
+                  <span
+                    key={i}
+                    className="h-6 w-16 animate-pulse rounded-full bg-muted"
+                  />
+                ))
+              : categories.map((cat) => (
+                  <Badge
+                    key={cat.id}
+                    id={`filter-${cat.slug}`}
+                    onClick={() =>
+                      setActiveCategory(
+                        activeCategory === cat.slug ? null : cat.slug
+                      )
+                    }
+                    variant={activeCategory === cat.slug ? "default" : "outline"}
+                    className={`cursor-pointer rounded-full px-4 py-1 text-xs font-bold tracking-wider uppercase ${
+                      activeCategory === cat.slug
+                        ? "border border-black bg-black text-white hover:bg-black/90"
+                        : "bg-white text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {cat.name}
+                  </Badge>
+                ))}
           </div>
         </div>
 
-        {/* Startup List */}
+        {/* Startup List — from DB, sorted by currentBid DESC */}
         <div className="flex flex-col">
-          {[
-            {
-              rank: 1,
-              name: "Stripe",
-              tag: "FINTECH",
-              time: "40m ago",
-              clicks: "1.2k clicks",
-              desc: "The standard for online payments.",
-              price: "$450",
-            },
-            {
-              rank: 2,
-              name: "Vercel",
-              tag: "DEV INFRA",
-              time: "40m ago",
-              clicks: "1.2k clicks",
-              desc: "Next-generation cloud infrastructure.",
-              price: "$380",
-            },
-            {
-              rank: 3,
-              name: "Linear",
-              tag: "PRODUCTIVITY",
-              time: "40m ago",
-              clicks: "1.2k clicks",
-              desc: "A collaborative workspace for high-performance teams.",
-              price: "$295",
-            },
-            {
-              rank: 4,
-              name: "Figma",
-              tag: "DESIGN",
-              time: "40m ago",
-              clicks: "1.2k clicks",
-              desc: "The collaborative interface design tool.",
-              price: "$210",
-            },
-            {
-              rank: 5,
-              name: "Supabase",
-              tag: "BAAS",
-              time: "40m ago",
-              clicks: "1.2k clicks",
-              desc: "The open source Firebase alternative.",
-              price: "$180",
-            },
-          ].map((startup, idx) => (
-            <div
-              key={startup.rank}
-              className="group -mx-4 flex flex-col justify-between rounded-lg border-b px-4 py-6 transition-colors hover:bg-black/5 sm:flex-row sm:items-center"
-            >
-              <div className="flex items-start gap-6 sm:items-center sm:gap-8">
-                <span
-                  className={`text-3xl font-black italic sm:text-4xl ${startup.rank === 1 ? "text-black" : "text-muted-foreground"}`}
-                >
-                  #{startup.rank}
-                </span>
-                <div className="flex flex-col">
-                  <div className="mb-1 flex flex-wrap items-center gap-2 sm:gap-3">
-                    <span className="text-xl font-bold text-black">
-                      {startup.name}
-                    </span>
-                    <Badge
-                      variant="secondary"
-                      className="bg-muted px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-muted-foreground uppercase"
-                    >
-                      {startup.tag}
-                    </Badge>
-                    <div className="hidden items-center gap-3 sm:flex">
-                      <span className="text-[10px] font-medium text-muted-foreground">
-                        {startup.time}
-                      </span>
-                      <span className="text-[10px] font-medium text-muted-foreground">
-                        {startup.clicks}
-                      </span>
-                    </div>
+          {loadingBoard ? (
+            [1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className="-mx-4 flex items-center justify-between rounded-lg border-b px-4 py-6"
+              >
+                <div className="flex items-center gap-8">
+                  <span className="h-8 w-10 animate-pulse rounded bg-muted" />
+                  <div className="flex flex-col gap-2">
+                    <span className="h-5 w-32 animate-pulse rounded bg-muted" />
+                    <span className="h-3 w-48 animate-pulse rounded bg-muted" />
                   </div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {startup.desc}
-                  </p>
                 </div>
+                <span className="h-8 w-16 animate-pulse rounded bg-muted" />
               </div>
-              <span className="mt-4 origin-right self-end text-2xl font-black text-orange-500 transition-transform group-hover:scale-105 sm:mt-0 sm:self-auto sm:text-3xl">
-                {startup.price}
-              </span>
+            ))
+          ) : leaderboard.length === 0 ? (
+            <div className="py-16 text-center text-muted-foreground">
+              <p className="text-lg font-bold">No startups yet</p>
+              <p className="mt-1 text-sm">
+                Be the first to claim your spot on the leaderboard!
+              </p>
             </div>
-          ))}
+          ) : (
+            leaderboard.map((entry) => (
+              <a
+                key={entry.slug}
+                href={entry.websiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                id={`startup-${entry.slug}`}
+                className="group -mx-4 flex flex-col justify-between rounded-lg border-b px-4 py-6 transition-colors hover:bg-black/5 sm:flex-row sm:items-center"
+              >
+                <div className="flex items-start gap-6 sm:items-center sm:gap-8">
+                  <span
+                    className={`text-3xl font-black italic sm:text-4xl ${entry.rank === 1 ? "text-black" : "text-muted-foreground"}`}
+                  >
+                    #{entry.rank}
+                  </span>
+                  <div className="flex flex-col">
+                    <div className="mb-1 flex flex-wrap items-center gap-2 sm:gap-3">
+                      <span className="text-xl font-bold text-black">
+                        {entry.name}
+                      </span>
+                      <Badge
+                        variant="secondary"
+                        className="bg-muted px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-muted-foreground uppercase"
+                      >
+                        {entry.category.name}
+                      </Badge>
+                      <div className="hidden items-center gap-3 sm:flex">
+                        <span className="text-[10px] font-medium text-muted-foreground">
+                          {timeAgo(entry.updatedAt)}
+                        </span>
+                        <span className="text-[10px] font-medium text-muted-foreground">
+                          {formatClicks(entry.clickCount)} clicks
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {entry.description ?? entry.websiteUrl}
+                    </p>
+                  </div>
+                </div>
+                <span className="mt-4 origin-right self-end text-2xl font-black text-orange-500 transition-transform group-hover:scale-105 sm:mt-0 sm:self-auto sm:text-3xl">
+                  {entry.currentBidFormatted}
+                </span>
+              </a>
+            ))
+          )}
         </div>
       </main>
 
@@ -332,7 +372,7 @@ export default function Page() {
                 className="h-5 w-5 fill-current"
                 aria-hidden="true"
               >
-                <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"></path>
+                <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z" />
               </svg>
             </a>
             <a
