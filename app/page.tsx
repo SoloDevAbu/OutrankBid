@@ -1,151 +1,164 @@
-"use client"
-
-import React, { useState, useEffect, useCallback } from "react"
+import React from "react"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Card, CardContent } from "@/components/ui/card"
-import { Eye, Loader2, RefreshCw } from "lucide-react"
+import type { Metadata } from "next"
+import { eq, count, desc, asc } from "drizzle-orm"
+import { db, startups, categories, clickEvents, platforms } from "@/db"
 import { HomeHeroCta } from "@/components/home-hero-cta"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  LeaderboardView,
+  type LeaderboardEntry,
+  type Category,
+  type Stats,
+} from "@/components/leaderboard-view"
 
 // ---------------------------------------------------------------------------
-// Types
+// Metadata
 // ---------------------------------------------------------------------------
 
-type LeaderboardEntry = {
-  rank: number
-  name: string
-  slug: string
-  category: { name: string; slug: string }
-  platform?: { name: string; slug: string; logoUrl: string | null } | null
-  currentBid: number
-  currentBidFormatted: string
-  clickCount: number
-  appUrl: string
-  description: string | null
-  logoUrl: string | null
-  createdAt: string
-  updatedAt: string
+export const metadata: Metadata = {
+  title: "OutrankBid — Live Startup Leaderboard",
+  description:
+    "The real-time leaderboard where startups compete for visibility. Filter by category, see live bid rankings, and discover what's trending now.",
+  alternates: { canonical: "https://outrankbid.com" },
 }
-
-type Category = { id: string; name: string; slug: string }
-
-type Stats = { activeCount: number; totalClicks: number }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatClicks(n: number): string {
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
-  return String(n)
+function formatCents(cents: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(cents / 100)
 }
 
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return "just now"
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  return `${Math.floor(hrs / 24)}d ago`
+// ---------------------------------------------------------------------------
+// Data fetching
+// ---------------------------------------------------------------------------
+
+async function getLeaderboard(): Promise<LeaderboardEntry[]> {
+  const rows = await db
+    .select({
+      id: startups.id,
+      name: startups.name,
+      slug: startups.slug,
+      categoryName: categories.name,
+      categorySlug: categories.slug,
+      platformName: platforms.name,
+      platformSlug: platforms.slug,
+      platformLogoUrl: platforms.logoUrl,
+      currentBid: startups.currentBid,
+      appUrl: startups.appUrl,
+      description: startups.description,
+      logoUrl: startups.logoUrl,
+      createdAt: startups.createdAt,
+      updatedAt: startups.updatedAt,
+      clickCount: count(clickEvents.id),
+    })
+    .from(startups)
+    .innerJoin(categories, eq(startups.categoryId, categories.id))
+    .leftJoin(platforms, eq(startups.platformId, platforms.id))
+    .leftJoin(clickEvents, eq(clickEvents.startupId, startups.id))
+    .where(eq(startups.status, "active"))
+    .groupBy(
+      startups.id,
+      startups.name,
+      startups.slug,
+      startups.currentBid,
+      startups.appUrl,
+      startups.description,
+      startups.logoUrl,
+      startups.createdAt,
+      startups.updatedAt,
+      categories.name,
+      categories.slug,
+      platforms.name,
+      platforms.slug,
+      platforms.logoUrl
+    )
+    .orderBy(desc(startups.currentBid), asc(startups.createdAt))
+
+  return rows.map((row, index) => ({
+    rank: index + 1,
+    name: row.name,
+    slug: row.slug,
+    category: { name: row.categoryName, slug: row.categorySlug },
+    platform: row.platformSlug
+      ? {
+          name: row.platformName!,
+          slug: row.platformSlug,
+          logoUrl: row.platformLogoUrl,
+        }
+      : null,
+    currentBid: row.currentBid,
+    currentBidFormatted: formatCents(row.currentBid),
+    clickCount: Number(row.clickCount),
+    appUrl: row.appUrl,
+    description: row.description,
+    logoUrl: row.logoUrl,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }))
+}
+
+async function getCategories(): Promise<Category[]> {
+  const rows = await db
+    .select({ id: categories.id, name: categories.name, slug: categories.slug })
+    .from(categories)
+    .orderBy(categories.name)
+  return rows
+}
+
+async function getStats(): Promise<Stats> {
+  const [activeResult, clickResult] = await Promise.all([
+    db
+      .select({ count: count() })
+      .from(startups)
+      .where(eq(startups.status, "active")),
+    db.select({ count: count() }).from(clickEvents),
+  ])
+  return {
+    activeCount: Number(activeResult[0]?.count ?? 0),
+    totalClicks: Number(clickResult[0]?.count ?? 0),
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
-export default function Page() {
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-  const [stats, setStats] = useState<Stats>({ activeCount: 0, totalClicks: 0 })
-  const [activeCategory, setActiveCategory] = useState<string | null>(null)
-  const [loadingBoard, setLoadingBoard] = useState(true)
-  const [loadingMeta, setLoadingMeta] = useState(true)
-  const [lastPullTime, setLastPullTime] = useState<number>(Date.now())
-  const [secondsSincePull, setSecondsSincePull] = useState(0)
+export default async function Page() {
+  const [leaderboard, cats, stats] = await Promise.all([
+    getLeaderboard(),
+    getCategories(),
+    getStats(),
+  ])
 
-  // Fetch categories + stats once
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/categories").then((r) => r.json()),
-      fetch("/api/stats").then((r) => r.json()),
-    ])
-      .then(([catData, statsData]) => {
-        setCategories(catData?.categories ?? [])
-        setStats({
-          activeCount: statsData?.activeCount ?? 0,
-          totalClicks: statsData?.totalClicks ?? 0,
-        })
-      })
-      .catch(console.error)
-      .finally(() => setLoadingMeta(false))
-  }, [])
-
-  // Fetch leaderboard (re-runs when category filter changes)
-  const fetchLeaderboard = useCallback(
-    (categorySlug: string | null, isPolling = false) => {
-      if (!isPolling) setLoadingBoard(true)
-      const url = categorySlug
-        ? `/api/leaderboard?category=${categorySlug}`
-        : "/api/leaderboard"
-      fetch(url)
-        .then((r) => r.json())
-        .then((data) => {
-          setLeaderboard(data?.leaderboard ?? [])
-          setLastPullTime(Date.now())
-          setSecondsSincePull(0)
-        })
-        .catch(console.error)
-        .finally(() => {
-          if (!isPolling) setLoadingBoard(false)
-        })
-    },
-    []
-  )
-
-  useEffect(() => {
-    fetchLeaderboard(activeCategory)
-
-    const interval = setInterval(() => {
-      fetchLeaderboard(activeCategory, true)
-    }, 30000)
-
-    return () => clearInterval(interval)
-  }, [activeCategory, fetchLeaderboard])
-
-  // Timer to update seconds ago
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSecondsSincePull(Math.floor((Date.now() - lastPullTime) / 1000))
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [lastPullTime])
-
-  const handleStartupClick = (slug: string) => {
-    // Optimistically update UI
-    setLeaderboard((prev) =>
-      prev.map((entry) =>
-        entry.slug === slug
-          ? { ...entry, clickCount: entry.clickCount + 1 }
-          : entry
-      )
-    )
-
-    // Track click on the backend
-    fetch("/api/click", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slug }),
-    }).catch(console.error)
-  }
-
+  // JSON-LD: ItemList schema for the top leaderboard entries
   const top3 = leaderboard.slice(0, 3)
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "OutrankBid Startup Leaderboard",
+    description:
+      "Top startups ranked by real-time community bids on OutrankBid",
+    itemListElement: top3.map((s, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: `https://outrankbid.com/startup/${s.slug}`,
+      name: s.name,
+    })),
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-[#fafafa] font-sans">
+      {/* JSON-LD structured data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       {/* Header */}
       <header className="flex items-center justify-between border-b border-black/10 bg-white px-6 py-3">
         <Link href="/" className="text-lg font-bold tracking-tight text-black">
@@ -157,307 +170,18 @@ export default function Page() {
         >
           How it works
         </Link>
-        {/* <div className="flex items-center gap-4">
-          <Button className="rounded-none bg-black px-6 font-bold text-white hover:bg-black/90">
-            LAUNCH
-          </Button>
-        </div> */}
       </header>
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-16 md:px-6">
-        {/* Top Stats Pill */}
-        <div className="mb-12 flex justify-center">
-          <div className="flex items-center gap-3 rounded-full border border-black/10 bg-white px-5 py-1.5 shadow-sm">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-emerald-400" />
-              <div className="flex space-x-1">
-                <span className="text-xs leading-none font-bold text-black">
-                  {loadingMeta ? (
-                    <span className="inline-block h-3 w-6 animate-pulse rounded bg-muted" />
-                  ) : (
-                    stats.activeCount
-                  )}
-                </span>
-                <span className="text-[8px] font-medium tracking-wider text-muted-foreground uppercase">
-                  Active
-                </span>
-              </div>
-            </div>
-            <Separator orientation="vertical" className="h-6" />
-            <div className="flex items-center gap-2">
-              <Eye className="h-4 w-4 text-muted-foreground" />
-              <div className="flex space-x-1">
-                <span className="text-xs leading-none font-bold text-black">
-                  {loadingMeta ? (
-                    <span className="inline-block h-3 w-8 animate-pulse rounded bg-muted" />
-                  ) : (
-                    formatClicks(stats.totalClicks)
-                  )}
-                </span>
-                <span className="text-[8px] font-medium tracking-wider text-muted-foreground uppercase">
-                  Visits
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Hero Section */}
-        <div className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
-          <div className="flex items-center">
-            <HomeHeroCta />
-          </div>
-
-          {/* Mini Leaderboard — top 3 from DB */}
-          <div className="flex flex-col">
-            <Card className="rounded-sm border-black/10 bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-black/10 p-3">
-                <span className="text-[8px] font-black tracking-widest text-muted-foreground uppercase">
-                  LEADERBOARD
-                </span>
-                <span className="flex items-center gap-1 text-[8px] font-black tracking-widest text-red-500 uppercase">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />{" "}
-                  LIVE NOW
-                </span>
-              </div>
-              <CardContent className="p-0">
-                {loadingBoard ? (
-                  <div className="flex flex-col">
-                    {[1, 2, 3].map((i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between border-b border-black/10 p-4 last:border-0"
-                      >
-                        <div className="flex items-center gap-4">
-                          <span className="h-8 w-8 animate-pulse rounded bg-muted" />
-                          <div className="flex flex-col gap-1">
-                            <span className="h-4 w-24 animate-pulse rounded bg-muted" />
-                            <span className="h-2 w-16 animate-pulse rounded bg-muted" />
-                          </div>
-                        </div>
-                        <span className="h-6 w-12 animate-pulse rounded bg-muted" />
-                      </div>
-                    ))}
-                  </div>
-                ) : top3.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-muted-foreground">
-                    No entries yet — be the first to claim a spot!
-                  </div>
-                ) : (
-                  <div className="flex flex-col">
-                    {top3.map((entry, idx) => (
-                      <a
-                        key={entry.slug}
-                        href={entry.appUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => handleStartupClick(entry.slug)}
-                        className={`flex items-center justify-between p-3 transition-colors hover:bg-muted/50 ${idx < top3.length - 1 ? "border-b border-black/10" : ""}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <span
-                            className={`text-2xl font-black italic ${entry.rank === 1 ? "text-black" : "text-muted-foreground"}`}
-                          >
-                            #{entry.rank}
-                          </span>
-                          {entry.logoUrl && (
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={entry.logoUrl} alt={`${entry.name} logo`} className="object-cover" />
-                              <AvatarFallback>{entry.name.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                          )}
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-base font-bold text-black">
-                                {entry.name}
-                              </span>
-                              <span className="rounded bg-muted px-1.5 py-0.5 text-[7px] font-bold tracking-wider text-muted-foreground uppercase">
-                                {entry.category.name}
-                              </span>
-                              {entry.platform && (
-                                <span className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[7px] font-bold tracking-wider text-muted-foreground uppercase">
-                                  {entry.platform.logoUrl && (
-                                    <img src={entry.platform.logoUrl} alt={entry.platform.name} className="h-2 w-2 object-contain opacity-70" />
-                                  )}
-                                  {entry.platform.name}
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[8px] font-medium text-muted-foreground">
-                              {timeAgo(entry.updatedAt)} •{" "}
-                              {formatClicks(entry.clickCount)} clicks
-                            </div>
-                          </div>
-                        </div>
-                        <span className="text-xl font-black text-orange-500">
-                          {entry.currentBidFormatted}
-                        </span>
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        <div className="mb-6 flex items-center">
-          <Separator className="flex-1" />
-          <div className="mx-4 flex items-center gap-2 text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-6 w-6 rounded-full border-black/10 text-black hover:bg-black/5"
-              onClick={() => fetchLeaderboard(activeCategory)}
-              disabled={loadingBoard}
-            >
-              <RefreshCw
-                className={`h-3 w-3 ${loadingBoard ? "animate-spin" : ""}`}
-              />
-            </Button>
-          </div>
-          <Separator className="flex-1" />
-        </div>
-
-        {/* Explore Section */}
-        <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-          <div className="flex flex-wrap gap-2">
-            {/* ALL filter */}
-            <Badge
-              id="filter-all"
-              onClick={() => setActiveCategory(null)}
-              variant={activeCategory === null ? "default" : "outline"}
-              className={`cursor-pointer rounded-full px-3 py-1 text-[10px] font-bold ${
-                activeCategory === null
-                  ? "border border-black bg-black text-white hover:bg-black/90"
-                  : "bg-white text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              ALL
-            </Badge>
-            {/* Dynamic categories from DB */}
-            {loadingMeta
-              ? [1, 2, 3].map((i) => (
-                  <span
-                    key={i}
-                    className="h-6 w-16 animate-pulse rounded-full bg-muted"
-                  />
-                ))
-              : categories.map((cat) => (
-                  <Badge
-                    key={cat.id}
-                    id={`filter-${cat.slug}`}
-                    onClick={() =>
-                      setActiveCategory(
-                        activeCategory === cat.slug ? null : cat.slug
-                      )
-                    }
-                    variant={
-                      activeCategory === cat.slug ? "default" : "outline"
-                    }
-                    className={`cursor-pointer rounded-full px-3 py-1 text-[10px] font-bold tracking-wider uppercase ${
-                      activeCategory === cat.slug
-                        ? "border border-black bg-black text-white hover:bg-black/90"
-                        : "bg-white text-muted-foreground hover:bg-muted"
-                    }`}
-                  >
-                    {cat.name}
-                  </Badge>
-                ))}
-          </div>
-        </div>
-
-        {/* Startup List — from DB, sorted by currentBid DESC */}
-        <div className="flex flex-col">
-          {loadingBoard ? (
-            [1, 2, 3, 4, 5].map((i) => (
-              <div
-                key={i}
-                className="-mx-4 flex items-center justify-between rounded-lg border-b border-black/10 px-4 py-4"
-              >
-                <div className="flex items-center gap-8">
-                  <span className="h-8 w-10 animate-pulse rounded bg-muted" />
-                  <div className="flex flex-col gap-2">
-                    <span className="h-5 w-32 animate-pulse rounded bg-muted" />
-                    <span className="h-3 w-48 animate-pulse rounded bg-muted" />
-                  </div>
-                </div>
-                <span className="h-8 w-16 animate-pulse rounded bg-muted" />
-              </div>
-            ))
-          ) : leaderboard.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
-              <p className="text-base font-bold">No startups yet</p>
-              <p className="mt-1 text-sm">
-                Be the first to claim your spot on the leaderboard!
-              </p>
-            </div>
-          ) : (
-            leaderboard.map((entry) => (
-              <a
-                key={entry.slug}
-                href={entry.appUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                id={`startup-${entry.slug}`}
-                onClick={() => handleStartupClick(entry.slug)}
-                className="group -mx-4 flex flex-col justify-between rounded-lg border-b border-black/10 px-4 py-4 transition-colors hover:bg-black/5 sm:flex-row sm:items-center"
-              >
-                <div className="flex items-start gap-4 sm:items-center sm:gap-6">
-                  <span
-                    className={`text-2xl font-black italic sm:text-3xl ${entry.rank === 1 ? "text-black" : "text-muted-foreground"}`}
-                  >
-                    #{entry.rank}
-                  </span>
-                  {entry.logoUrl && (
-                    <Avatar className="h-12 w-12 sm:h-14 sm:w-14">
-                      <AvatarImage src={entry.logoUrl} alt={`${entry.name} logo`} className="object-cover" />
-                      <AvatarFallback>{entry.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                  )}
-                  <div className="flex flex-col">
-                    <div className="mb-1 flex flex-wrap items-center gap-2 sm:gap-3">
-                      <span className="text-lg font-bold text-black">
-                        {entry.name}
-                      </span>
-                      <Badge
-                        variant="secondary"
-                        className="bg-muted px-1.5 py-0.5 text-[8px] font-bold tracking-wider text-muted-foreground uppercase"
-                      >
-                        {entry.category.name}
-                      </Badge>
-                      {entry.platform && (
-                        <Badge
-                          variant="secondary"
-                          className="flex items-center gap-1 bg-muted px-1.5 py-0.5 text-[8px] font-bold tracking-wider text-muted-foreground uppercase"
-                        >
-                          {entry.platform.logoUrl && (
-                            <img src={entry.platform.logoUrl} alt={entry.platform.name} className="h-2.5 w-2.5 object-contain opacity-70" />
-                          )}
-                          {entry.platform.name}
-                        </Badge>
-                      )}
-                      <div className="hidden items-center gap-3 sm:flex">
-                        <span className="text-[9px] font-medium text-muted-foreground">
-                          {timeAgo(entry.updatedAt)}
-                        </span>
-                        <span className="text-[9px] font-medium text-muted-foreground">
-                          {formatClicks(entry.clickCount)} clicks
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-xs font-medium text-muted-foreground">
-                      {entry.description ?? entry.appUrl}
-                    </p>
-                  </div>
-                </div>
-                <span className="mt-3 origin-right self-end text-xl font-black text-orange-500 transition-transform group-hover:scale-105 sm:mt-0 sm:self-auto sm:text-2xl">
-                  {entry.currentBidFormatted}
-                </span>
-              </a>
-            ))
-          )}
-        </div>
+        {/* LeaderboardView handles stats pill, two-col hero+mini-board, filters, full list */}
+        <LeaderboardView
+          initialData={leaderboard}
+          initialCategories={cats}
+          initialStats={stats}
+          activeCategory={null}
+          categoryPage={false}
+          heroSlot={<HomeHeroCta />}
+        />
       </main>
 
       {/* Footer */}
@@ -470,6 +194,9 @@ export default function Page() {
             <a
               href="https://x.com/AbuBakkar2502"
               className="text-black transition-colors hover:text-black/80"
+              rel="noopener noreferrer"
+              target="_blank"
+              aria-label="Follow on X (Twitter)"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -482,6 +209,9 @@ export default function Page() {
             <a
               href="https://www.linkedin.com/in/abu-bakkar-siddique-546112205"
               className="text-black transition-colors hover:text-black/80"
+              rel="noopener noreferrer"
+              target="_blank"
+              aria-label="Connect on LinkedIn"
             >
               <svg
                 viewBox="0 0 24 24"
