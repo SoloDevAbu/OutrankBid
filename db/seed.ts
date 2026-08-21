@@ -80,7 +80,7 @@ async function main() {
 
   // Demo owner IDs (placeholder strings — replace with real auth IDs later)
   const OWNER_ALICE = "demo_owner_alice"
-  const OWNER_BOB   = "demo_owner_bob"
+  const OWNER_BOB = "demo_owner_bob"
   const OWNER_CAROL = "demo_owner_carol"
 
   const startupDefs = [
@@ -92,7 +92,7 @@ async function main() {
       websiteUrl: "https://vectormind.io",
       description:
         "The fastest vector search database built for production AI workloads.",
-      currentBid: 45000, // $450.00 in cents
+      currentBid: 100, // $450.00 in cents
     },
     {
       ownerId: OWNER_BOB,
@@ -102,7 +102,7 @@ async function main() {
       websiteUrl: "https://deploykit.dev",
       description:
         "One-command deployments to any cloud, with zero config drift.",
-      currentBid: 32000, // $320.00
+      currentBid: 200, // $320.00
     },
     {
       ownerId: OWNER_CAROL,
@@ -112,7 +112,7 @@ async function main() {
       websiteUrl: "https://formforge.app",
       description:
         "Build beautiful, conversion-optimised forms in minutes without code.",
-      currentBid: 21000, // $210.00
+      currentBid: 300, // $210.00
     },
     {
       ownerId: OWNER_ALICE,
@@ -121,7 +121,7 @@ async function main() {
       slug: "snippetly",
       websiteUrl: "https://snippetly.dev",
       description: "A private snippet manager for developers who hate clutter.",
-      currentBid: 9500, // $95.00
+      currentBid: 400, // $95.00
     },
     {
       ownerId: OWNER_BOB,
@@ -131,7 +131,7 @@ async function main() {
       websiteUrl: "https://launchlane.co",
       description:
         "Curated early-access waitlist platform for pre-launch startups.",
-      currentBid: 17500, // $175.00
+      currentBid: 500, // $175.00
     },
   ]
 
@@ -165,11 +165,11 @@ async function main() {
   console.log("  → inserting demo bids…")
   const bidDefs = [
     { startup: existingStartups[0], userId: OWNER_ALICE, amount: 45000 },
-    { startup: existingStartups[0], userId: OWNER_BOB,   amount: 30000 },
-    { startup: existingStartups[1], userId: OWNER_BOB,   amount: 32000 },
+    { startup: existingStartups[0], userId: OWNER_BOB, amount: 30000 },
+    { startup: existingStartups[1], userId: OWNER_BOB, amount: 32000 },
     { startup: existingStartups[2], userId: OWNER_CAROL, amount: 21000 },
-    { startup: existingStartups[3], userId: OWNER_ALICE, amount: 9500  },
-    { startup: existingStartups[4], userId: OWNER_BOB,   amount: 17500 },
+    { startup: existingStartups[3], userId: OWNER_ALICE, amount: 9500 },
+    { startup: existingStartups[4], userId: OWNER_BOB, amount: 17500 },
   ]
 
   await db

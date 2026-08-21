@@ -1,11 +1,12 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Card, CardContent } from "@/components/ui/card"
-import { Eye, Loader2 } from "lucide-react"
+import { Eye, Loader2, RefreshCw } from "lucide-react"
 import { HomeHeroCta } from "@/components/home-hero-cta"
 
 // ---------------------------------------------------------------------------
@@ -61,6 +62,8 @@ export default function Page() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [loadingBoard, setLoadingBoard] = useState(true)
   const [loadingMeta, setLoadingMeta] = useState(true)
+  const [lastPullTime, setLastPullTime] = useState<number>(Date.now())
+  const [secondsSincePull, setSecondsSincePull] = useState(0)
 
   // Fetch categories + stats once
   useEffect(() => {
@@ -80,21 +83,41 @@ export default function Page() {
   }, [])
 
   // Fetch leaderboard (re-runs when category filter changes)
-  const fetchLeaderboard = useCallback((categorySlug: string | null) => {
-    setLoadingBoard(true)
+  const fetchLeaderboard = useCallback((categorySlug: string | null, isPolling = false) => {
+    if (!isPolling) setLoadingBoard(true)
     const url = categorySlug
       ? `/api/leaderboard?category=${categorySlug}`
       : "/api/leaderboard"
     fetch(url)
       .then((r) => r.json())
-      .then((data) => setLeaderboard(data?.leaderboard ?? []))
+      .then((data) => {
+        setLeaderboard(data?.leaderboard ?? [])
+        setLastPullTime(Date.now())
+        setSecondsSincePull(0)
+      })
       .catch(console.error)
-      .finally(() => setLoadingBoard(false))
+      .finally(() => {
+        if (!isPolling) setLoadingBoard(false)
+      })
   }, [])
 
   useEffect(() => {
     fetchLeaderboard(activeCategory)
+
+    const interval = setInterval(() => {
+      fetchLeaderboard(activeCategory, true)
+    }, 30000)
+
+    return () => clearInterval(interval)
   }, [activeCategory, fetchLeaderboard])
+
+  // Timer to update seconds ago
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSecondsSincePull(Math.floor((Date.now() - lastPullTime) / 1000))
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [lastPullTime])
 
   const handleStartupClick = (slug: string) => {
     // Optimistically update UI
@@ -120,10 +143,15 @@ export default function Page() {
     <div className="flex min-h-screen flex-col bg-[#fafafa] font-sans">
       {/* Header */}
       <header className="flex items-center justify-between border-b border-black/10 bg-white px-6 py-3">
-        <div className="text-lg font-bold tracking-tight text-black">OutrankBid</div>
-        <div className="hidden text-[10px] font-semibold tracking-widest text-muted-foreground uppercase md:block">
+        <Link href="/" className="text-lg font-bold tracking-tight text-black">
+          OutrankBid
+        </Link>
+        <Link 
+          href="/how-it-works"
+          className="hidden text-[10px] font-semibold tracking-widest text-muted-foreground uppercase transition-colors hover:text-black md:block"
+        >
           How it works
-        </div>
+        </Link>
         {/* <div className="flex items-center gap-4">
           <Button className="rounded-none bg-black px-6 font-bold text-white hover:bg-black/90">
             LAUNCH
@@ -254,7 +282,22 @@ export default function Page() {
           </div>
         </div>
 
-        <Separator className="mb-6" />
+        <div className="mb-6 flex items-center">
+          <Separator className="flex-1" />
+          <div className="mx-4 flex items-center gap-2 text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+            <span className="tabular-nums">LAST PULL {secondsSincePull}S AGO</span>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-6 w-6 rounded-full border-black/10 text-black hover:bg-black/5"
+              onClick={() => fetchLeaderboard(activeCategory)}
+              disabled={loadingBoard}
+            >
+              <RefreshCw className={`h-3 w-3 ${loadingBoard ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
+          <Separator className="flex-1" />
+        </div>
 
         {/* Explore Section */}
         <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
