@@ -2,6 +2,10 @@ import React from "react"
 import Link from "next/link"
 import type { Metadata } from "next"
 import { eq, count, desc, asc } from "drizzle-orm"
+
+// Force server-side rendering on every request — never statically cached at build time.
+// Without this, Vercel generates the page once at build (empty DB) and serves stale HTML forever.
+export const dynamic = "force-dynamic"
 import { db, startups, categories, clickEvents, platforms } from "@/db"
 import { HomeHeroCta } from "@/components/home-hero-cta"
 import {
@@ -38,89 +42,104 @@ function formatCents(cents: number): string {
 // ---------------------------------------------------------------------------
 
 async function getLeaderboard(): Promise<LeaderboardEntry[]> {
-  const rows = await db
-    .select({
-      id: startups.id,
-      name: startups.name,
-      slug: startups.slug,
-      categoryName: categories.name,
-      categorySlug: categories.slug,
-      platformName: platforms.name,
-      platformSlug: platforms.slug,
-      platformLogoUrl: platforms.logoUrl,
-      currentBid: startups.currentBid,
-      appUrl: startups.appUrl,
-      description: startups.description,
-      logoUrl: startups.logoUrl,
-      createdAt: startups.createdAt,
-      updatedAt: startups.updatedAt,
-      clickCount: count(clickEvents.id),
-    })
-    .from(startups)
-    .innerJoin(categories, eq(startups.categoryId, categories.id))
-    .leftJoin(platforms, eq(startups.platformId, platforms.id))
-    .leftJoin(clickEvents, eq(clickEvents.startupId, startups.id))
-    .where(eq(startups.status, "active"))
-    .groupBy(
-      startups.id,
-      startups.name,
-      startups.slug,
-      startups.currentBid,
-      startups.appUrl,
-      startups.description,
-      startups.logoUrl,
-      startups.createdAt,
-      startups.updatedAt,
-      categories.name,
-      categories.slug,
-      platforms.name,
-      platforms.slug,
-      platforms.logoUrl
-    )
-    .orderBy(desc(startups.currentBid), asc(startups.createdAt))
+  try {
+    const rows = await db
+      .select({
+        id: startups.id,
+        name: startups.name,
+        slug: startups.slug,
+        categoryName: categories.name,
+        categorySlug: categories.slug,
+        platformName: platforms.name,
+        platformSlug: platforms.slug,
+        platformLogoUrl: platforms.logoUrl,
+        currentBid: startups.currentBid,
+        appUrl: startups.appUrl,
+        description: startups.description,
+        logoUrl: startups.logoUrl,
+        createdAt: startups.createdAt,
+        updatedAt: startups.updatedAt,
+        clickCount: count(clickEvents.id),
+      })
+      .from(startups)
+      .innerJoin(categories, eq(startups.categoryId, categories.id))
+      .leftJoin(platforms, eq(startups.platformId, platforms.id))
+      .leftJoin(clickEvents, eq(clickEvents.startupId, startups.id))
+      .where(eq(startups.status, "active"))
+      .groupBy(
+        startups.id,
+        startups.name,
+        startups.slug,
+        startups.currentBid,
+        startups.appUrl,
+        startups.description,
+        startups.logoUrl,
+        startups.createdAt,
+        startups.updatedAt,
+        categories.name,
+        categories.slug,
+        platforms.name,
+        platforms.slug,
+        platforms.logoUrl
+      )
+      .orderBy(desc(startups.currentBid), asc(startups.createdAt))
 
-  return rows.map((row, index) => ({
-    rank: index + 1,
-    name: row.name,
-    slug: row.slug,
-    category: { name: row.categoryName, slug: row.categorySlug },
-    platform: row.platformSlug
-      ? {
-          name: row.platformName!,
-          slug: row.platformSlug,
-          logoUrl: row.platformLogoUrl,
-        }
-      : null,
-    currentBid: row.currentBid,
-    currentBidFormatted: formatCents(row.currentBid),
-    clickCount: Number(row.clickCount),
-    appUrl: row.appUrl,
-    description: row.description,
-    logoUrl: row.logoUrl,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  }))
+    return rows.map((row, index) => ({
+      rank: index + 1,
+      name: row.name,
+      slug: row.slug,
+      category: { name: row.categoryName, slug: row.categorySlug },
+      platform: row.platformSlug
+        ? {
+            name: row.platformName!,
+            slug: row.platformSlug,
+            logoUrl: row.platformLogoUrl,
+          }
+        : null,
+      currentBid: row.currentBid,
+      currentBidFormatted: formatCents(row.currentBid),
+      clickCount: Number(row.clickCount),
+      appUrl: row.appUrl,
+      description: row.description,
+      logoUrl: row.logoUrl,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    }))
+  } catch (err) {
+    console.error("[page] getLeaderboard failed:", err)
+    return []
+  }
 }
 
 async function getCategories(): Promise<Category[]> {
-  const rows = await db
-    .select({ id: categories.id, name: categories.name, slug: categories.slug })
-    .from(categories)
-    .orderBy(categories.name)
-  return rows
+  try {
+    const rows = await db
+      .select({ id: categories.id, name: categories.name, slug: categories.slug })
+      .from(categories)
+      .orderBy(categories.name)
+    return rows
+  } catch (err) {
+    console.error("[page] getCategories failed:", err)
+    return []
+  }
 }
 
 async function getStats(): Promise<Stats> {
-  const [activeResult, clickResult] = await Promise.all([
-    db
-      .select({ count: count() })
-      .from(startups)
-      .where(eq(startups.status, "active")),
-    db.select({ count: count() }).from(clickEvents),
-  ])
-  return {
-    activeCount: Number(activeResult[0]?.count ?? 0),
-    totalClicks: Number(clickResult[0]?.count ?? 0),
+  try {
+    const [activeResult, clickResult] = await Promise.all([
+      db
+        .select({ count: count() })
+        .from(startups)
+        .where(eq(startups.status, "active")),
+      db.select({ count: count() }).from(clickEvents),
+    ])
+    return {
+      activeCount: Number(activeResult[0]?.count ?? 0),
+      totalClicks: Number(clickResult[0]?.count ?? 0),
+    }
+  } catch (err) {
+    console.error("[page] getStats failed:", err)
+    return { activeCount: 0, totalClicks: 0 }
   }
 }
 

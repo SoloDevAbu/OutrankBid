@@ -109,7 +109,17 @@ export function LeaderboardView({
     []
   )
 
-  // 30-second polling — only after mount; first paint uses server-fetched initialData
+  // Immediate fallback fetch — fires only when the server returned empty data.
+  // This covers the edge case where a cold start / DB hiccup caused the server
+  // component to return [] instead of waiting the full 30s for the first poll.
+  useEffect(() => {
+    if (initialData.length === 0) {
+      fetchLeaderboard(propCategory)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 30-second polling — keeps data live after the initial server-rendered snapshot
   useEffect(() => {
     const interval = setInterval(() => {
       fetchLeaderboard(activeCategory, true)
