@@ -1,8 +1,10 @@
 import { Webhooks } from "@dodopayments/nextjs"
-import { withTransaction } from "@/db/transaction"
+import { withTransaction, type Tx } from "@/db/transaction"
 import { startups, bids, payments, categories } from "@/db"
-import { db } from "@/db"
 import { eq, sql } from "drizzle-orm"
+
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
 /**
  * Dodo Payments Webhook (POST)
@@ -10,7 +12,7 @@ import { eq, sql } from "drizzle-orm"
  *
  * Security:
  * - Uses HMAC signature verification via DODO_PAYMENTS_WEBHOOK_SECRET
- * - Do not parse/modify the raw request body before verification (adapter handles this)
+ * - Adapter consumes the raw body; do not parse/modify request body
  *
  * Env required:
  *   DODO_PAYMENTS_WEBHOOK_SECRET=...
@@ -38,13 +40,18 @@ function getMetadata(p: any): Record<string, any> {
 }
 
 function getAmountSmallestUnit(p: any): number | null {
+  // Prefer total_amount; accept amount; accept numeric strings too (adapter may serialize as string)
   const c = [
+    p?.data?.total_amount,
     p?.data?.amount,
+    p?.data?.payment?.total_amount,
     p?.data?.payment?.amount,
     p?.data?.payload?.amount,
   ]
-  for (const v of c)
+  for (const v of c) {
     if (typeof v === "number" && Number.isFinite(v)) return v as number
+    if (typeof v === "string" && /^\d+$/.test(v)) return Number(v)
+  }
   return null
 }
 
@@ -60,7 +67,14 @@ function getCurrency(p: any): string | null {
 }
 
 function getProviderPaymentId(p: any): string | null {
-  const c = [p?.data?.id, p?.data?.payment_id, p?.data?.payment?.id]
+  // Prefer payment_id when present; fall back to id/provider_payment_id
+  const c = [
+    p?.data?.payment_id,
+    p?.data?.payment?.payment_id,
+    p?.data?.id,
+    p?.data?.payment?.id,
+    p?.data?.provider_payment_id,
+  ]
   for (const v of c) if (typeof v === "string" && v) return v as string
   return null
 }
@@ -82,11 +96,10 @@ function nameFromUrl(websiteUrl: string): string {
 
 /**
  * Find or create a "General" catch-all category for auto-created startups.
- * Uses onConflictDoNothing + re-fetch to be safe against concurrent webhook calls.
+ * Runs inside the same transaction to avoid mixed clients.
  */
-async function findOrCreateGeneralCategory(): Promise<string> {
-  // Try to find first
-  const existing = await db
+async function findOrCreateGeneralCategory(tx: Tx): Promise<string> {
+  const existing = await tx
     .select({ id: categories.id })
     .from(categories)
     .where(eq(categories.slug, "general"))
@@ -94,14 +107,16 @@ async function findOrCreateGeneralCategory(): Promise<string> {
 
   if (existing[0]) return existing[0].id
 
-  // Insert — ignore conflict if two webhooks race here simultaneously
-  await db
+  await tx
     .insert(categories)
-    .values({ name: "General", slug: "general", description: "General category" })
-    .onConflictDoNothing()
+    .values({
+      name: "General",
+      slug: "general",
+      description: "General category",
+    })
+    .onConflictDoNothing?.()
 
-  // Always re-fetch after upsert to get the guaranteed-existing row
-  const [row] = await db
+  const [row] = await tx
     .select({ id: categories.id })
     .from(categories)
     .where(eq(categories.slug, "general"))
@@ -113,33 +128,38 @@ async function findOrCreateGeneralCategory(): Promise<string> {
 export const POST = Webhooks({
   webhookKey: process.env.DODO_PAYMENTS_WEBHOOK_SECRET!,
   onPayload: async (payload) => {
-    const type = getEventType(payload)
-
-    // Accept only payment lifecycle events we care about
-    if (type !== "payment.succeeded" && type !== "payment.failed") {
-      console.log("[webhook] Ignoring event type:", type)
-      return
+    try {
+      const d: any = (payload as any)?.data ?? {}
+      console.log("[webhook] Received", {
+        type: getEventType(payload),
+        providerPaymentId: d.payment_id ?? d.id ?? null,
+        hasMeta: Boolean(d.metadata),
+      })
+    } catch {
+      // ignore log failures
     }
-
+  },
+  onPaymentFailed: async (payload) => {
+    const d: any = (payload as any)?.data ?? {}
+    console.log("[webhook] payment.failed", {
+      id: d.payment_id ?? d.id ?? null,
+      reason: d.failure_reason ?? d.message ?? null,
+    })
+    // optional: persist failure audit row here
+  },
+  onPaymentSucceeded: async (payload) => {
     const meta = getMetadata(payload) || {}
     const amount = getAmountSmallestUnit(payload)
     const currency = getCurrency(payload) ?? "USD"
     const providerPaymentId = getProviderPaymentId(payload)
 
-    console.log("[webhook] Received", {
-      type,
+    console.log("[webhook] payment.succeeded", {
       providerPaymentId,
       amount,
       currency,
       metadata: meta,
     })
 
-    if (type === "payment.failed") {
-      // Nothing to persist yet — optionally insert failure audit table here.
-      return
-    }
-
-    // payment.succeeded
     if (amount === null || amount <= 0 || !providerPaymentId) {
       console.warn("[webhook] Missing critical fields; skipping persist")
       return
@@ -201,10 +221,9 @@ export const POST = Webhooks({
             websiteUrlFromMeta
           )
 
-          const categoryId = await findOrCreateGeneralCategory()
+          const categoryId = await findOrCreateGeneralCategory(tx)
           const name = nameFromUrl(websiteUrlFromMeta)
           const baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
-          // Add timestamp suffix to guarantee uniqueness
           const slug = `${baseSlug}-${Date.now().toString(36)}`
 
           const [newStartup] = await tx
