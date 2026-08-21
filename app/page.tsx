@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { Card, CardContent } from "@/components/ui/card"
 import { Eye, Loader2, RefreshCw } from "lucide-react"
 import { HomeHeroCta } from "@/components/home-hero-cta"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -259,7 +260,10 @@ export default function Page() {
                             #{entry.rank}
                           </span>
                           {entry.logoUrl && (
-                            <img src={entry.logoUrl} alt={`${entry.name} logo`} className="h-8 w-8 rounded-full object-cover" />
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={entry.logoUrl} alt={`${entry.name} logo`} className="object-cover" />
+                              <AvatarFallback>{entry.name.charAt(0)}</AvatarFallback>
+                            </Avatar>
                           )}
                           <div>
                             <div className="flex items-center gap-2">
@@ -291,9 +295,6 @@ export default function Page() {
         <div className="mb-6 flex items-center">
           <Separator className="flex-1" />
           <div className="mx-4 flex items-center gap-2 text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
-            <span className="tabular-nums">
-              LAST PULL {secondsSincePull}S AGO
-            </span>
             <Button
               variant="outline"
               size="icon"
@@ -400,7 +401,10 @@ export default function Page() {
                     #{entry.rank}
                   </span>
                   {entry.logoUrl && (
-                    <img src={entry.logoUrl} alt={`${entry.name} logo`} className="h-12 w-12 rounded-full object-cover sm:h-14 sm:w-14" />
+                    <Avatar className="h-12 w-12 sm:h-14 sm:w-14">
+                      <AvatarImage src={entry.logoUrl} alt={`${entry.name} logo`} className="object-cover" />
+                      <AvatarFallback>{entry.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
                   )}
                   <div className="flex flex-col">
                     <div className="mb-1 flex flex-wrap items-center gap-2 sm:gap-3">
@@ -444,7 +448,7 @@ export default function Page() {
         <div className="flex flex-col items-center gap-3 md:items-end">
           <div className="flex items-center gap-4">
             <a
-              href="#"
+              href="https://x.com/AbuBakkar2502"
               className="text-black transition-colors hover:text-black/80"
             >
               <svg
@@ -456,7 +460,7 @@ export default function Page() {
               </svg>
             </a>
             <a
-              href="#"
+              href="https://www.linkedin.com/in/abu-bakkar-siddique-546112205"
               className="text-black transition-colors hover:text-black/80"
             >
               <svg
