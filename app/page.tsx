@@ -19,6 +19,7 @@ type LeaderboardEntry = {
   name: string
   slug: string
   category: { name: string; slug: string }
+  platform?: { name: string; slug: string; logoUrl: string | null } | null
   currentBid: number
   currentBidFormatted: string
   clickCount: number
@@ -273,6 +274,14 @@ export default function Page() {
                               <span className="rounded bg-muted px-1.5 py-0.5 text-[7px] font-bold tracking-wider text-muted-foreground uppercase">
                                 {entry.category.name}
                               </span>
+                              {entry.platform && (
+                                <span className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[7px] font-bold tracking-wider text-muted-foreground uppercase">
+                                  {entry.platform.logoUrl && (
+                                    <img src={entry.platform.logoUrl} alt={entry.platform.name} className="h-2 w-2 object-contain opacity-70" />
+                                  )}
+                                  {entry.platform.name}
+                                </span>
+                              )}
                             </div>
                             <div className="text-[8px] font-medium text-muted-foreground">
                               {timeAgo(entry.updatedAt)} •{" "}
@@ -417,6 +426,17 @@ export default function Page() {
                       >
                         {entry.category.name}
                       </Badge>
+                      {entry.platform && (
+                        <Badge
+                          variant="secondary"
+                          className="flex items-center gap-1 bg-muted px-1.5 py-0.5 text-[8px] font-bold tracking-wider text-muted-foreground uppercase"
+                        >
+                          {entry.platform.logoUrl && (
+                            <img src={entry.platform.logoUrl} alt={entry.platform.name} className="h-2.5 w-2.5 object-contain opacity-70" />
+                          )}
+                          {entry.platform.name}
+                        </Badge>
+                      )}
                       <div className="hidden items-center gap-3 sm:flex">
                         <span className="text-[9px] font-medium text-muted-foreground">
                           {timeAgo(entry.updatedAt)}

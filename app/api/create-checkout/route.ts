@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { db, startups, categories } from "@/db"
+import { db, startups, categories, platforms } from "@/db"
 import { eq } from "drizzle-orm"
 import { scrapeAppInfo } from "@/lib/scrape-app"
 
@@ -131,6 +131,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Category not found" }, { status: 400 })
     }
 
+    // Determine platform
+    let platformId: string | null = null
+    const u = new URL(normalizedHref)
+    const platformSlug = u.hostname === "apps.apple.com" ? "ios" : "android"
+    const platRows = await db
+      .select({ id: platforms.id })
+      .from(platforms)
+      .where(eq(platforms.slug, platformSlug))
+      .limit(1)
+    if (platRows.length > 0) {
+      platformId = platRows[0].id
+    }
+
     // Scrape app info
     const scraped = await scrapeAppInfo(normalizedHref)
     const appName = scraped.name || "Unknown App"
@@ -157,6 +170,7 @@ export async function POST(request: Request) {
         logoUrl: logoUrl,
         description: description || null,
         categoryId: catId,
+        platformId: platformId,
       }).where(eq(startups.id, existing[0].id))
       finalStartupId = existing[0].id
     } else {
@@ -166,6 +180,7 @@ export async function POST(request: Request) {
         .values({
           ownerId: userId || "anonymous",
           categoryId: catId,
+          platformId: platformId,
           name: appName,
           slug,
           appUrl: normalizedHref,

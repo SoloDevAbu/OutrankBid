@@ -71,6 +71,34 @@ async function main() {
   }
 
   // ------------------------------------------------------------------
+  // Platforms
+  // ------------------------------------------------------------------
+  console.log("  → inserting platforms…")
+  const platformDefs = [
+    { name: "iOS", slug: "ios", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg" },
+    { name: "Android", slug: "android", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/d/d7/Android_robot.svg" },
+  ]
+
+  const insertedPlatforms = await db
+    .insert(schema.platforms)
+    .values(platformDefs)
+    .onConflictDoNothing()
+    .returning()
+
+  const platformMap = Object.fromEntries(
+    insertedPlatforms.map((p) => [p.slug, p.id])
+  )
+
+  const existingPlatforms =
+    insertedPlatforms.length === 0
+      ? await db.select().from(schema.platforms)
+      : insertedPlatforms
+
+  for (const p of existingPlatforms) {
+    platformMap[p.slug] = p.id
+  }
+
+  // ------------------------------------------------------------------
   // Startups
   //
   // ownerId is an opaque string — no users table. In production this
@@ -138,9 +166,10 @@ async function main() {
   const insertedStartups = await db
     .insert(schema.startups)
     .values(
-      startupDefs.map((s) => ({
+      startupDefs.map((s, i) => ({
         ownerId: s.ownerId,
         categoryId: categoryMap[s.categorySlug],
+        platformId: platformMap[i % 2 === 0 ? "ios" : "android"],
         name: s.name,
         slug: s.slug,
         appUrl: s.appUrl,

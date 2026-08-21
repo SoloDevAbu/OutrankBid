@@ -44,6 +44,23 @@ export const categories = pgTable("categories", {
 })
 
 // ---------------------------------------------------------------------------
+// Platforms
+// ---------------------------------------------------------------------------
+
+export const platforms = pgTable("platforms", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  logoUrl: text("logo_url"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+})
+
+// ---------------------------------------------------------------------------
 // Startups
 // ---------------------------------------------------------------------------
 
@@ -60,6 +77,8 @@ export const startups = pgTable(
     categoryId: uuid("category_id")
       .notNull()
       .references(() => categories.id, { onDelete: "restrict" }),
+    platformId: uuid("platform_id")
+      .references(() => platforms.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
     appUrl: text("app_url").notNull().unique(),
@@ -209,6 +228,9 @@ export const clickEvents = pgTable(
 
 export type Category = typeof categories.$inferSelect
 export type NewCategory = typeof categories.$inferInsert
+
+export type Platform = typeof platforms.$inferSelect
+export type NewPlatform = typeof platforms.$inferInsert
 
 export type Startup = typeof startups.$inferSelect
 export type NewStartup = typeof startups.$inferInsert

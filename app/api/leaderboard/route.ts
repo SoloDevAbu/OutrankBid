@@ -1,5 +1,5 @@
 import { type NextRequest } from "next/server"
-import { db, startups, categories, clickEvents } from "@/db"
+import { db, startups, categories, clickEvents, platforms } from "@/db"
 import { eq, and, count, desc, asc } from "drizzle-orm"
 
 export async function GET(request: NextRequest) {
@@ -22,6 +22,9 @@ export async function GET(request: NextRequest) {
         slug: startups.slug,
         categoryName: categories.name,
         categorySlug: categories.slug,
+        platformName: platforms.name,
+        platformSlug: platforms.slug,
+        platformLogoUrl: platforms.logoUrl,
         currentBid: startups.currentBid,
         appUrl: startups.appUrl,
         description: startups.description,
@@ -32,6 +35,7 @@ export async function GET(request: NextRequest) {
       })
       .from(startups)
       .innerJoin(categories, eq(startups.categoryId, categories.id))
+      .leftJoin(platforms, eq(startups.platformId, platforms.id))
       .leftJoin(clickEvents, eq(clickEvents.startupId, startups.id))
       .where(whereClause)
       .groupBy(
@@ -45,7 +49,10 @@ export async function GET(request: NextRequest) {
         startups.createdAt,
         startups.updatedAt,
         categories.name,
-        categories.slug
+        categories.slug,
+        platforms.name,
+        platforms.slug,
+        platforms.logoUrl
       )
       // Primary sort: highest bid first.  Secondary: earliest creation for
       // tiebreaks so the order is deterministic even before any bids come in.
@@ -60,6 +67,11 @@ export async function GET(request: NextRequest) {
         name: row.categoryName,
         slug: row.categorySlug,
       },
+      platform: row.platformSlug ? {
+        name: row.platformName,
+        slug: row.platformSlug,
+        logoUrl: row.platformLogoUrl,
+      } : null,
       currentBid: row.currentBid,
       // currentBid is stored in cents; expose a formatted dollar string too
       // so the client doesn't have to do the conversion itself.
