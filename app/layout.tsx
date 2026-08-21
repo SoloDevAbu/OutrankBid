@@ -40,6 +40,9 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  verification: {
+    google: "google4ef8c7fa7f3999bc",
+  },
 }
 
 // ---------------------------------------------------------------------------
