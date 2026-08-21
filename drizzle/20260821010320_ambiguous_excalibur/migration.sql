@@ -1,0 +1,1 @@
+ALTER TABLE "startups" ADD CONSTRAINT "startups_website_url_key" UNIQUE("website_url");

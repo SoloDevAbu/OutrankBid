@@ -241,7 +241,17 @@ export const POST = Webhooks({
           })
           .returning()
 
-        if (amount > startupRow.currentBid) {
+        if (meta.is_top_up === "true") {
+          // Top-up: always accumulate new amount on top of existing bid
+          await tx
+            .update(startups)
+            .set({
+              currentBid: startupRow.currentBid + amount,
+              updatedAt: sql`now()`,
+            })
+            .where(eq(startups.id, startupRow.id))
+        } else if (amount > startupRow.currentBid) {
+          // New listing: only update if this bid is higher than the current one
           await tx
             .update(startups)
             .set({ currentBid: amount, updatedAt: sql`now()` })

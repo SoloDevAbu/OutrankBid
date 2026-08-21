@@ -8,6 +8,7 @@ type CreateCheckoutBody = {
   userId?: string
   description?: string
   categorySlug?: string
+  isTopUp?: boolean // if true, amount is added on top of existing currentBid
 }
 
 function normalizeUrlOrigin(raw: string): string | null {
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
     userId,
     description,
     categorySlug,
+    isTopUp,
   } = body as CreateCheckoutBody
 
   if (!Number.isInteger(amountCents) || amountCents <= 0) {
@@ -111,6 +113,7 @@ export async function POST(request: Request) {
       ...(userId ? { user_id: userId } : {}),
       ...(description ? { description } : {}),
       ...(categorySlug ? { category_slug: categorySlug } : {}),
+      is_top_up: isTopUp ? "true" : "false",
       source: "home_hero",
       environment: process.env.DODO_PAYMENTS_ENVIRONMENT ?? "test_mode",
     },
