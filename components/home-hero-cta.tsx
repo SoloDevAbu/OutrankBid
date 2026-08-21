@@ -5,6 +5,23 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { MinusCircle, PlusCircle, ArrowRight, Loader2 } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 
 function normalizeUrl(raw: string): string | null {
   let input = raw.trim()
@@ -24,6 +41,12 @@ export function HomeHeroCta() {
   const [website, setWebsite] = useState<string>("")
   const [loading, setLoading] = useState(false)
   const [priceLoading, setPriceLoading] = useState(true)
+  const [showDialog, setShowDialog] = useState(false)
+  const [description, setDescription] = useState("")
+  const [category, setCategory] = useState("")
+  const [categories, setCategories] = useState<{ id: string; name: string; slug: string }[]>([])
+  const [error, setError] = useState<string | null>(null)
+
   const min = 1
   const max = 5000
 
@@ -40,6 +63,11 @@ export function HomeHeroCta() {
         // keep default of 1 on error
       })
       .finally(() => setPriceLoading(false))
+
+    fetch("/api/categories")
+      .then((r) => r.json())
+      .then((data) => setCategories(data?.categories || []))
+      .catch(() => {})
   }, [])
 
   const dec = () => setPrice((p) => Math.max(min, p - 1))
@@ -51,12 +79,29 @@ export function HomeHeroCta() {
     setPrice(Math.min(max, Math.max(min, val)))
   }
 
-  async function startCheckout() {
+  function handleClaimClick() {
+    setError(null)
     const normalized = normalizeUrl(website)
     if (!normalized) {
-      alert("Enter a valid website URL (e.g., example.com).")
+      setError("Enter a valid website URL (e.g., example.com).")
       return
     }
+    setShowDialog(true)
+  }
+
+  async function startCheckout() {
+    setError(null)
+    if (!category) {
+      setError("Please select a category.")
+      return
+    }
+    if (!description) {
+      setError("Please provide a short description.")
+      return
+    }
+    const normalized = normalizeUrl(website)
+    if (!normalized) return
+
     const amountCents = Math.round(price * 100)
     setLoading(true)
     try {
@@ -67,6 +112,8 @@ export function HomeHeroCta() {
           amountCents,
           websiteUrl: normalized,
           currency: "USD",
+          description,
+          categorySlug: category,
         }),
       })
       if (!res.ok) {
@@ -79,7 +126,7 @@ export function HomeHeroCta() {
       window.location.href = url
     } catch (e: any) {
       console.error("[create-checkout] failed", e)
-      alert(e?.message || "Failed to start checkout")
+      setError(e?.message || "Failed to start checkout")
     } finally {
       setLoading(false)
     }
@@ -144,12 +191,16 @@ export function HomeHeroCta() {
           onChange={(e) => setWebsite(e.target.value)}
           placeholder="Enter your startup URL..."
           className="h-10 text-sm rounded-none border-r-0 bg-white focus-visible:ring-0 focus-visible:ring-offset-0"
-          onKeyDown={(e) => e.key === "Enter" && startCheckout()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && website.trim()) {
+              handleClaimClick()
+            }
+          }}
         />
         <Button
           id="claim-spot-btn"
-          onClick={startCheckout}
-          disabled={loading || priceLoading}
+          onClick={handleClaimClick}
+          disabled={loading || priceLoading || !website.trim()}
           className="h-10 rounded-none bg-black px-5 text-sm font-bold whitespace-nowrap text-white hover:bg-black/90"
         >
           {loading ? (
@@ -163,6 +214,70 @@ export function HomeHeroCta() {
           )}
         </Button>
       </div>
+
+      {error && (
+        <Alert variant="destructive" className="mt-4 border-red-500 bg-red-50 text-red-600 dark:bg-red-950/20">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Complete your listing</DialogTitle>
+            <DialogDescription>
+              Provide a short description and select a category so people know what your startup does.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="description" className="text-sm font-medium leading-none">
+                Description
+              </label>
+              <Input
+                id="description"
+                placeholder="The fastest way to build..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium leading-none">
+                Category
+              </label>
+              <Select value={category} onValueChange={(val) => setCategory(val || "")}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.slug}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              disabled={loading || !description || !category}
+              onClick={startCheckout}
+              className="bg-black text-white hover:bg-black/90"
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" /> PROCEEDING...
+                </span>
+              ) : (
+                "PROCEED TO PAY"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

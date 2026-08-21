@@ -6,6 +6,8 @@ type CreateCheckoutBody = {
   currency?: string // default: USD
   startupId?: string
   userId?: string
+  description?: string
+  categorySlug?: string
 }
 
 function normalizeUrlOrigin(raw: string): string | null {
@@ -42,6 +44,8 @@ export async function POST(request: Request) {
     currency: rawCurrency,
     startupId,
     userId,
+    description,
+    categorySlug,
   } = body as CreateCheckoutBody
 
   if (!Number.isInteger(amountCents) || amountCents <= 0) {
@@ -105,6 +109,8 @@ export async function POST(request: Request) {
       website_url: origin,
       ...(startupId ? { startup_id: startupId } : {}),
       ...(userId ? { user_id: userId } : {}),
+      ...(description ? { description } : {}),
+      ...(categorySlug ? { category_slug: categorySlug } : {}),
       source: "home_hero",
       environment: process.env.DODO_PAYMENTS_ENVIRONMENT ?? "test_mode",
     },
