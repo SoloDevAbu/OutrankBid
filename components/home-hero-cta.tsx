@@ -87,33 +87,33 @@ export function HomeHeroCta() {
 
   return (
     <div className="flex flex-col justify-start">
-      <h1 className="mb-4 text-4xl leading-[1.1] font-black tracking-tighter text-black lg:text-5xl">
+      <h1 className="mb-3 text-2xl leading-[1.1] font-black tracking-tighter text-black lg:text-4xl">
         YOUR STARTUP
         <br />
         DESERVES THE
         <br />
         ATTENTION.
       </h1>
-      <p className="mb-6 max-w-md text-base text-muted-foreground">
+      <p className="mb-4 max-w-sm text-sm text-muted-foreground">
         The internet's live leaderboard where startups compete for the top spot.
       </p>
-      <Card className="mb-6 overflow-hidden rounded-sm border-2 border-orange-500 bg-white shadow-sm">
-        <CardContent className="flex flex-col items-center justify-center p-6 text-center">
-          <div className="mb-3 text-xs font-black tracking-widest text-black uppercase">
+      <Card className="mb-4 overflow-hidden rounded-sm border-2 border-orange-500 bg-white shadow-sm">
+        <CardContent className="flex flex-col items-center justify-center p-2.5 text-center">
+          <div className="mb-2 text-[10px] font-black tracking-widest text-black uppercase">
             GET #1 SPOT FOR
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <MinusCircle
-              className="h-6 w-6 cursor-pointer text-black hover:text-orange-500 transition-colors"
+              className="h-5 w-5 cursor-pointer text-black transition-colors hover:text-orange-500"
               onClick={dec}
             />
             {priceLoading ? (
-              <div className="flex h-14 w-32 items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-orange-400" />
+              <div className="flex h-12 w-28 items-center justify-center">
+                <Loader2 className="h-5 w-5 animate-spin text-orange-400" />
               </div>
             ) : (
-              <div className="flex items-center text-5xl font-black tracking-tighter text-orange-500">
-                <span className="mr-1 text-3xl">$</span>
+              <div className="flex items-center text-4xl font-black tracking-tighter text-orange-500">
+                <span className="mr-1 text-2xl">$</span>
                 <input
                   id="bid-price-input"
                   type="number"
@@ -121,17 +121,17 @@ export function HomeHeroCta() {
                   max={max}
                   value={price}
                   onChange={handlePriceChange}
-                  className="w-28 bg-transparent text-center outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className="w-24 [appearance:textfield] bg-transparent text-center outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   aria-label="Bid amount in dollars"
                 />
               </div>
             )}
             <PlusCircle
-              className="h-6 w-6 cursor-pointer text-black hover:text-orange-500 transition-colors"
+              className="h-5 w-5 cursor-pointer text-black transition-colors hover:text-orange-500"
               onClick={inc}
             />
           </div>
-          <p className="mt-2 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+          <p className="mt-1.5 text-[8px] font-medium tracking-wide text-muted-foreground uppercase">
             You pay exactly this amount
           </p>
         </CardContent>
@@ -143,14 +143,14 @@ export function HomeHeroCta() {
           value={website}
           onChange={(e) => setWebsite(e.target.value)}
           placeholder="Enter your startup URL..."
-          className="h-12 rounded-none border-r-0 bg-white focus-visible:ring-0 focus-visible:ring-offset-0"
+          className="h-10 text-sm rounded-none border-r-0 bg-white focus-visible:ring-0 focus-visible:ring-offset-0"
           onKeyDown={(e) => e.key === "Enter" && startCheckout()}
         />
         <Button
           id="claim-spot-btn"
           onClick={startCheckout}
           disabled={loading || priceLoading}
-          className="h-12 rounded-none bg-black px-6 font-bold whitespace-nowrap text-white hover:bg-black/90"
+          className="h-10 rounded-none bg-black px-5 text-sm font-bold whitespace-nowrap text-white hover:bg-black/90"
         >
           {loading ? (
             <span className="flex items-center gap-2">

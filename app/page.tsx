@@ -101,49 +101,49 @@ export default function Page() {
   return (
     <div className="flex min-h-screen flex-col bg-[#fafafa] font-sans">
       {/* Header */}
-      <header className="flex items-center justify-between border-b bg-white px-8 py-4">
-        <div className="text-xl font-bold tracking-tight">OutrankBid</div>
-        <div className="hidden text-xs font-semibold tracking-widest text-muted-foreground uppercase md:block">
+      <header className="flex items-center justify-between border-b bg-white px-6 py-3">
+        <div className="text-lg font-bold tracking-tight">OutrankBid</div>
+        <div className="hidden text-[10px] font-semibold tracking-widest text-muted-foreground uppercase md:block">
           How it works
         </div>
-        <div className="flex items-center gap-4">
+        {/* <div className="flex items-center gap-4">
           <Button className="rounded-none bg-black px-6 font-bold text-white hover:bg-black/90">
             LAUNCH
           </Button>
-        </div>
+        </div> */}
       </header>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-8 pb-24 md:px-8">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-16 md:px-6">
         {/* Top Stats Pill */}
-        <div className="mb-16 flex justify-center">
-          <div className="flex items-center gap-4 rounded-full border bg-white px-6 py-2 shadow-sm">
+        <div className="mb-12 flex justify-center">
+          <div className="flex items-center gap-3 rounded-full border bg-white px-5 py-1.5 shadow-sm">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
-              <div className="flex flex-col">
-                <span className="text-sm leading-none font-bold">
+              <div className="flex space-x-1">
+                <span className="text-xs leading-none font-bold">
                   {loadingMeta ? (
                     <span className="inline-block h-3 w-6 animate-pulse rounded bg-muted" />
                   ) : (
                     stats.activeCount
                   )}
                 </span>
-                <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                <span className="text-[8px] font-medium tracking-wider text-muted-foreground uppercase">
                   Active
                 </span>
               </div>
             </div>
-            <Separator orientation="vertical" className="h-8" />
+            <Separator orientation="vertical" className="h-6" />
             <div className="flex items-center gap-2">
               <Eye className="h-4 w-4 text-muted-foreground" />
-              <div className="flex flex-col">
-                <span className="text-sm leading-none font-bold">
+              <div className="flex space-x-1">
+                <span className="text-xs leading-none font-bold">
                   {loadingMeta ? (
                     <span className="inline-block h-3 w-8 animate-pulse rounded bg-muted" />
                   ) : (
                     formatClicks(stats.totalClicks)
                   )}
                 </span>
-                <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                <span className="text-[8px] font-medium tracking-wider text-muted-foreground uppercase">
                   Visits
                 </span>
               </div>
@@ -152,17 +152,19 @@ export default function Page() {
         </div>
 
         {/* Hero Section */}
-        <div className="mb-12 grid grid-cols-1 gap-12 lg:grid-cols-2">
-          <HomeHeroCta />
+        <div className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
+          <div className="flex items-center">
+            <HomeHeroCta />
+          </div>
 
           {/* Mini Leaderboard — top 3 from DB */}
           <div className="flex flex-col">
             <Card className="rounded-sm bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b p-4">
-                <span className="text-[10px] font-black tracking-widest text-muted-foreground uppercase">
+              <div className="flex items-center justify-between border-b p-3">
+                <span className="text-[8px] font-black tracking-widest text-muted-foreground uppercase">
                   LEADERBOARD
                 </span>
-                <span className="flex items-center gap-1 text-[10px] font-black tracking-widest text-red-500 uppercase">
+                <span className="flex items-center gap-1 text-[8px] font-black tracking-widest text-red-500 uppercase">
                   <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />{" "}
                   LIVE NOW
                 </span>
@@ -187,7 +189,7 @@ export default function Page() {
                     ))}
                   </div>
                 ) : top3.length === 0 ? (
-                  <div className="p-8 text-center text-sm text-muted-foreground">
+                  <div className="p-6 text-center text-xs text-muted-foreground">
                     No entries yet — be the first to claim a spot!
                   </div>
                 ) : (
@@ -195,30 +197,30 @@ export default function Page() {
                     {top3.map((entry, idx) => (
                       <div
                         key={entry.slug}
-                        className={`flex items-center justify-between p-4 transition-colors hover:bg-muted/50 ${idx < top3.length - 1 ? "border-b" : ""}`}
+                        className={`flex items-center justify-between p-3 transition-colors hover:bg-muted/50 ${idx < top3.length - 1 ? "border-b" : ""}`}
                       >
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
                           <span
-                            className={`text-3xl font-black italic ${entry.rank === 1 ? "text-black" : "text-muted-foreground"}`}
+                            className={`text-2xl font-black italic ${entry.rank === 1 ? "text-black" : "text-muted-foreground"}`}
                           >
                             #{entry.rank}
                           </span>
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="text-lg font-bold text-black">
+                              <span className="text-base font-bold text-black">
                                 {entry.name}
                               </span>
-                              <span className="rounded bg-muted px-1.5 py-0.5 text-[8px] font-bold tracking-wider text-muted-foreground uppercase">
+                              <span className="rounded bg-muted px-1.5 py-0.5 text-[7px] font-bold tracking-wider text-muted-foreground uppercase">
                                 {entry.category.name}
                               </span>
                             </div>
-                            <div className="text-[10px] font-medium text-muted-foreground">
+                            <div className="text-[8px] font-medium text-muted-foreground">
                               {timeAgo(entry.updatedAt)} •{" "}
                               {formatClicks(entry.clickCount)} clicks
                             </div>
                           </div>
                         </div>
-                        <span className="text-2xl font-black text-orange-500">
+                        <span className="text-xl font-black text-orange-500">
                           {entry.currentBidFormatted}
                         </span>
                       </div>
@@ -230,20 +232,17 @@ export default function Page() {
           </div>
         </div>
 
-        <Separator className="mb-8" />
+        <Separator className="mb-6" />
 
         {/* Explore Section */}
-        <div className="mb-8 flex flex-col justify-between gap-6 md:flex-row md:items-center">
-          <h2 className="text-3xl font-black tracking-tighter text-black">
-            EXPLORE
-          </h2>
+        <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
           <div className="flex flex-wrap gap-2">
             {/* ALL filter */}
             <Badge
               id="filter-all"
               onClick={() => setActiveCategory(null)}
               variant={activeCategory === null ? "default" : "outline"}
-              className={`cursor-pointer rounded-full px-4 py-1 text-xs font-bold ${
+              className={`cursor-pointer rounded-full px-3 py-1 text-[10px] font-bold ${
                 activeCategory === null
                   ? "border border-black bg-black text-white hover:bg-black/90"
                   : "bg-white text-muted-foreground hover:bg-muted"
@@ -268,8 +267,10 @@ export default function Page() {
                         activeCategory === cat.slug ? null : cat.slug
                       )
                     }
-                    variant={activeCategory === cat.slug ? "default" : "outline"}
-                    className={`cursor-pointer rounded-full px-4 py-1 text-xs font-bold tracking-wider uppercase ${
+                    variant={
+                      activeCategory === cat.slug ? "default" : "outline"
+                    }
+                    className={`cursor-pointer rounded-full px-3 py-1 text-[10px] font-bold tracking-wider uppercase ${
                       activeCategory === cat.slug
                         ? "border border-black bg-black text-white hover:bg-black/90"
                         : "bg-white text-muted-foreground hover:bg-muted"
@@ -287,7 +288,7 @@ export default function Page() {
             [1, 2, 3, 4, 5].map((i) => (
               <div
                 key={i}
-                className="-mx-4 flex items-center justify-between rounded-lg border-b px-4 py-6"
+                className="-mx-4 flex items-center justify-between rounded-lg border-b px-4 py-4"
               >
                 <div className="flex items-center gap-8">
                   <span className="h-8 w-10 animate-pulse rounded bg-muted" />
@@ -300,8 +301,8 @@ export default function Page() {
               </div>
             ))
           ) : leaderboard.length === 0 ? (
-            <div className="py-16 text-center text-muted-foreground">
-              <p className="text-lg font-bold">No startups yet</p>
+            <div className="py-12 text-center text-muted-foreground">
+              <p className="text-base font-bold">No startups yet</p>
               <p className="mt-1 text-sm">
                 Be the first to claim your spot on the leaderboard!
               </p>
@@ -314,40 +315,40 @@ export default function Page() {
                 target="_blank"
                 rel="noopener noreferrer"
                 id={`startup-${entry.slug}`}
-                className="group -mx-4 flex flex-col justify-between rounded-lg border-b px-4 py-6 transition-colors hover:bg-black/5 sm:flex-row sm:items-center"
+                className="group -mx-4 flex flex-col justify-between rounded-lg border-b px-4 py-4 transition-colors hover:bg-black/5 sm:flex-row sm:items-center"
               >
-                <div className="flex items-start gap-6 sm:items-center sm:gap-8">
+                <div className="flex items-start gap-4 sm:items-center sm:gap-6">
                   <span
-                    className={`text-3xl font-black italic sm:text-4xl ${entry.rank === 1 ? "text-black" : "text-muted-foreground"}`}
+                    className={`text-2xl font-black italic sm:text-3xl ${entry.rank === 1 ? "text-black" : "text-muted-foreground"}`}
                   >
                     #{entry.rank}
                   </span>
                   <div className="flex flex-col">
                     <div className="mb-1 flex flex-wrap items-center gap-2 sm:gap-3">
-                      <span className="text-xl font-bold text-black">
+                      <span className="text-lg font-bold text-black">
                         {entry.name}
                       </span>
                       <Badge
                         variant="secondary"
-                        className="bg-muted px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-muted-foreground uppercase"
+                        className="bg-muted px-1.5 py-0.5 text-[8px] font-bold tracking-wider text-muted-foreground uppercase"
                       >
                         {entry.category.name}
                       </Badge>
                       <div className="hidden items-center gap-3 sm:flex">
-                        <span className="text-[10px] font-medium text-muted-foreground">
+                        <span className="text-[9px] font-medium text-muted-foreground">
                           {timeAgo(entry.updatedAt)}
                         </span>
-                        <span className="text-[10px] font-medium text-muted-foreground">
+                        <span className="text-[9px] font-medium text-muted-foreground">
                           {formatClicks(entry.clickCount)} clicks
                         </span>
                       </div>
                     </div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-xs font-medium text-muted-foreground">
                       {entry.description ?? entry.websiteUrl}
                     </p>
                   </div>
                 </div>
-                <span className="mt-4 origin-right self-end text-2xl font-black text-orange-500 transition-transform group-hover:scale-105 sm:mt-0 sm:self-auto sm:text-3xl">
+                <span className="mt-3 origin-right self-end text-xl font-black text-orange-500 transition-transform group-hover:scale-105 sm:mt-0 sm:self-auto sm:text-2xl">
                   {entry.currentBidFormatted}
                 </span>
               </a>
@@ -357,8 +358,8 @@ export default function Page() {
       </main>
 
       {/* Footer */}
-      <footer className="flex flex-col items-center justify-between border-t bg-[#f5f5f5] px-8 py-12 md:flex-row">
-        <div className="mb-6 text-lg font-bold tracking-tight text-black md:mb-0">
+      <footer className="flex flex-col items-center justify-between border-t bg-[#f5f5f5] px-6 py-8 md:flex-row">
+        <div className="mb-4 text-base font-bold tracking-tight text-black md:mb-0">
           OutrankBid
         </div>
         <div className="flex flex-col items-center gap-3 md:items-end">
@@ -388,7 +389,7 @@ export default function Page() {
               </svg>
             </a>
           </div>
-          <div className="text-[10px] font-black tracking-widest text-muted-foreground uppercase">
+          <div className="text-[8px] font-black tracking-widest text-muted-foreground uppercase">
             BUILT BY @ABUBAKKAR2502
           </div>
         </div>

@@ -82,8 +82,10 @@ function nameFromUrl(websiteUrl: string): string {
 
 /**
  * Find or create a "General" catch-all category for auto-created startups.
+ * Uses onConflictDoNothing + re-fetch to be safe against concurrent webhook calls.
  */
 async function findOrCreateGeneralCategory(): Promise<string> {
+  // Try to find first
   const existing = await db
     .select({ id: categories.id })
     .from(categories)
@@ -92,12 +94,20 @@ async function findOrCreateGeneralCategory(): Promise<string> {
 
   if (existing[0]) return existing[0].id
 
-  const [created] = await db
+  // Insert — ignore conflict if two webhooks race here simultaneously
+  await db
     .insert(categories)
     .values({ name: "General", slug: "general", description: "General category" })
-    .returning({ id: categories.id })
+    .onConflictDoNothing()
 
-  return created.id
+  // Always re-fetch after upsert to get the guaranteed-existing row
+  const [row] = await db
+    .select({ id: categories.id })
+    .from(categories)
+    .where(eq(categories.slug, "general"))
+    .limit(1)
+
+  return row.id
 }
 
 export const POST = Webhooks({
@@ -150,6 +160,17 @@ export const POST = Webhooks({
 
     try {
       await withTransaction(async (tx) => {
+        // 0) Idempotency guard — skip if this providerPaymentId was already recorded
+        const existingPayment = await tx
+          .select({ id: payments.id })
+          .from(payments)
+          .where(eq(payments.providerPaymentId, providerPaymentId))
+          .limit(1)
+        if (existingPayment[0]) {
+          console.log("[webhook] Already processed:", providerPaymentId)
+          return
+        }
+
         // 1) Resolve startup (prefer explicit startup_id; else match by website_url)
         let startupRow: { id: string; currentBid: number } | null = null
 
@@ -248,6 +269,8 @@ export const POST = Webhooks({
       })
     } catch (err) {
       console.error("[webhook] Failed to persist payment event:", err)
+      // Re-throw so the adapter returns 500 — Dodo will retry the webhook automatically
+      throw err
     }
   },
 })
