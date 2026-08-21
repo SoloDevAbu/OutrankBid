@@ -31,12 +31,20 @@ function getEventType(p: any): string {
 }
 
 function getMetadata(p: any): Record<string, any> {
-  return (
+  let meta = (
     (p?.data?.metadata as Record<string, any> | undefined) ??
     (p?.metadata as Record<string, any> | undefined) ??
     (p?.data?.payment?.metadata as Record<string, any> | undefined) ??
     {}
   )
+  if (typeof meta === "string") {
+    try {
+      meta = JSON.parse(meta)
+    } catch {
+      meta = {}
+    }
+  }
+  return meta as Record<string, any>
 }
 
 function getAmountSmallestUnit(p: any): number | null {
@@ -129,177 +137,162 @@ export const POST = Webhooks({
   webhookKey: process.env.DODO_PAYMENTS_WEBHOOK_SECRET!,
   onPayload: async (payload) => {
     try {
+      const type = getEventType(payload)
       const d: any = (payload as any)?.data ?? {}
+      
       console.log("[webhook] Received", {
-        type: getEventType(payload),
+        type,
         providerPaymentId: d.payment_id ?? d.id ?? null,
         hasMeta: Boolean(d.metadata),
       })
-    } catch {
-      // ignore log failures
-    }
-  },
-  onPaymentFailed: async (payload) => {
-    const d: any = (payload as any)?.data ?? {}
-    console.log("[webhook] payment.failed", {
-      id: d.payment_id ?? d.id ?? null,
-      reason: d.failure_reason ?? d.message ?? null,
-    })
-    // optional: persist failure audit row here
-  },
-  onPaymentSucceeded: async (payload) => {
-    const meta = getMetadata(payload) || {}
-    const amount = getAmountSmallestUnit(payload)
-    const currency = getCurrency(payload) ?? "USD"
-    const providerPaymentId = getProviderPaymentId(payload)
 
-    console.log("[webhook] payment.succeeded", {
-      providerPaymentId,
-      amount,
-      currency,
-      metadata: meta,
-    })
+      if (type === "payment.failed") {
+        console.log("[webhook] payment.failed", {
+          id: d.payment_id ?? d.id ?? null,
+          reason: d.failure_reason ?? d.message ?? null,
+        })
+        return
+      }
 
-    if (amount === null || amount <= 0 || !providerPaymentId) {
-      console.warn("[webhook] Missing critical fields; skipping persist")
-      return
-    }
+      if (type === "payment.succeeded") {
+        const meta = getMetadata(payload) || {}
+        const amount = getAmountSmallestUnit(payload)
+        const currency = getCurrency(payload) ?? "USD"
+        const providerPaymentId = getProviderPaymentId(payload)
 
-    const startupIdFromMeta =
-      typeof meta.startup_id === "string" && meta.startup_id.trim().length > 0
-        ? (meta.startup_id as string)
-        : null
-    const websiteUrlFromMeta =
-      typeof meta.website_url === "string" && meta.website_url.trim().length > 0
-        ? (meta.website_url as string)
-        : null
-    const userIdFromMeta =
-      typeof meta.user_id === "string" && meta.user_id.trim().length > 0
-        ? (meta.user_id as string)
-        : "anonymous"
+        console.log("[webhook] processing payment.succeeded", {
+          providerPaymentId,
+          amount,
+          currency,
+          metadata: meta,
+        })
 
-    try {
-      await withTransaction(async (tx) => {
-        // 0) Idempotency guard — skip if this providerPaymentId was already recorded
-        const existingPayment = await tx
-          .select({ id: payments.id })
-          .from(payments)
-          .where(eq(payments.providerPaymentId, providerPaymentId))
-          .limit(1)
-        if (existingPayment[0]) {
-          console.log("[webhook] Already processed:", providerPaymentId)
+        if (amount === null || amount <= 0 || !providerPaymentId) {
+          console.warn("[webhook] Missing critical fields; skipping persist")
           return
         }
 
-        // 1) Resolve startup (prefer explicit startup_id; else match by website_url)
-        let startupRow: { id: string; currentBid: number } | null = null
+        const startupIdFromMeta =
+          typeof meta.startup_id === "string" && meta.startup_id.trim().length > 0
+            ? (meta.startup_id as string)
+            : null
+        const websiteUrlFromMeta =
+          typeof meta.website_url === "string" && meta.website_url.trim().length > 0
+            ? (meta.website_url as string)
+            : null
+        const userIdFromMeta =
+          typeof meta.user_id === "string" && meta.user_id.trim().length > 0
+            ? (meta.user_id as string)
+            : "anonymous"
 
-        if (startupIdFromMeta) {
-          const rows = await tx
-            .select({ id: startups.id, currentBid: startups.currentBid })
-            .from(startups)
-            .where(eq(startups.id, startupIdFromMeta))
-            .for("update")
+        await withTransaction(async (tx) => {
+          // 0) Idempotency guard
+          const existingPayment = await tx
+            .select({ id: payments.id })
+            .from(payments)
+            .where(eq(payments.providerPaymentId, providerPaymentId))
             .limit(1)
-          startupRow = rows[0] ?? null
-        }
+          if (existingPayment[0]) {
+            console.log("[webhook] Already processed:", providerPaymentId)
+            return
+          }
 
-        if (!startupRow && websiteUrlFromMeta) {
-          const rows = await tx
-            .select({ id: startups.id, currentBid: startups.currentBid })
-            .from(startups)
-            .where(eq(startups.websiteUrl, websiteUrlFromMeta))
-            .for("update")
-            .limit(1)
-          startupRow = rows[0] ?? null
-        }
+          // 1) Resolve startup
+          let startupRow: { id: string; currentBid: number } | null = null
 
-        // 2) If startup still not found, auto-create it from the website URL
-        if (!startupRow && websiteUrlFromMeta) {
-          console.log(
-            "[webhook] Startup not found — auto-creating for:",
-            websiteUrlFromMeta
-          )
+          if (startupIdFromMeta) {
+            const rows = await tx
+              .select({ id: startups.id, currentBid: startups.currentBid })
+              .from(startups)
+              .where(eq(startups.id, startupIdFromMeta))
+              .for("update")
+              .limit(1)
+            startupRow = rows[0] ?? null
+          }
 
-          const categoryId = await findOrCreateGeneralCategory(tx)
-          const name = nameFromUrl(websiteUrlFromMeta)
-          const baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
-          const slug = `${baseSlug}-${Date.now().toString(36)}`
+          if (!startupRow && websiteUrlFromMeta) {
+            const rows = await tx
+              .select({ id: startups.id, currentBid: startups.currentBid })
+              .from(startups)
+              .where(eq(startups.websiteUrl, websiteUrlFromMeta))
+              .for("update")
+              .limit(1)
+            startupRow = rows[0] ?? null
+          }
 
-          const [newStartup] = await tx
-            .insert(startups)
+          // 2) Auto-create startup
+          if (!startupRow && websiteUrlFromMeta) {
+            console.log("[webhook] Auto-creating startup for:", websiteUrlFromMeta)
+            const categoryId = await findOrCreateGeneralCategory(tx)
+            const name = nameFromUrl(websiteUrlFromMeta)
+            const baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
+            const slug = `${baseSlug}-${Date.now().toString(36)}`
+
+            const [newStartup] = await tx
+              .insert(startups)
+              .values({
+                ownerId: userIdFromMeta,
+                categoryId,
+                name,
+                slug,
+                websiteUrl: websiteUrlFromMeta,
+                currentBid: 0,
+                status: "active",
+              })
+              .returning({ id: startups.id, currentBid: startups.currentBid })
+
+            startupRow = newStartup
+          }
+
+          if (!startupRow) {
+            console.warn("[webhook] Could not resolve startup; skipping")
+            return
+          }
+
+          // 3) Insert bid
+          const [bidRow] = await tx
+            .insert(bids)
             .values({
-              ownerId: userIdFromMeta,
-              categoryId,
-              name,
-              slug,
-              websiteUrl: websiteUrlFromMeta,
-              currentBid: 0,
-              status: "active",
+              startupId: startupRow.id,
+              userId: userIdFromMeta,
+              amount,
+              currency,
             })
-            .returning({ id: startups.id, currentBid: startups.currentBid })
+            .returning()
 
-          startupRow = newStartup
-        }
+          if (meta.is_top_up === "true") {
+            await tx
+              .update(startups)
+              .set({
+                currentBid: startupRow.currentBid + amount,
+                updatedAt: sql`now()`,
+              })
+              .where(eq(startups.id, startupRow.id))
+          } else if (amount > startupRow.currentBid) {
+            await tx
+              .update(startups)
+              .set({ currentBid: amount, updatedAt: sql`now()` })
+              .where(eq(startups.id, startupRow.id))
+          }
 
-        if (!startupRow) {
-          console.warn(
-            "[webhook] Could not resolve or create startup — no website_url in metadata; skipping"
-          )
-          return
-        }
-
-        // 3) Insert bid (immutable), then conditionally bump leaderboard currentBid
-        const [bidRow] = await tx
-          .insert(bids)
-          .values({
-            startupId: startupRow.id,
-            userId: userIdFromMeta,
-            amount,
-            currency,
-          })
-          .returning()
-
-        if (meta.is_top_up === "true") {
-          // Top-up: always accumulate new amount on top of existing bid
+          // 4) Record payment row
           await tx
-            .update(startups)
-            .set({
-              currentBid: startupRow.currentBid + amount,
-              updatedAt: sql`now()`,
+            .insert(payments)
+            .values({
+              bidId: bidRow.id,
+              provider: "dodo",
+              providerPaymentId,
+              amount,
+              currency,
+              status: "paid",
             })
-            .where(eq(startups.id, startupRow.id))
-        } else if (amount > startupRow.currentBid) {
-          // New listing: only update if this bid is higher than the current one
-          await tx
-            .update(startups)
-            .set({ currentBid: amount, updatedAt: sql`now()` })
-            .where(eq(startups.id, startupRow.id))
-        }
-
-        // 4) Record payment row (idempotent on providerPaymentId unique)
-        await tx
-          .insert(payments)
-          .values({
-            bidId: bidRow.id,
-            provider: "dodo",
-            providerPaymentId,
-            amount,
-            currency,
-            status: "paid",
-          })
-          .onConflictDoNothing?.()
-      })
-
-      console.log("[webhook] Persisted payment + bid successfully", {
-        providerPaymentId,
-        amount,
-        currency,
-      })
+            .onConflictDoNothing?.()
+        })
+        console.log("[webhook] Persisted payment successfully", { providerPaymentId })
+      }
     } catch (err) {
-      console.error("[webhook] Failed to persist payment event:", err)
-      // Re-throw so the adapter returns 500 — Dodo will retry the webhook automatically
-      throw err
+      console.error("[webhook] Error in payload processing:", err)
+      throw err // Allow Dodo to retry
     }
   },
 })
