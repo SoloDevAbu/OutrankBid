@@ -1,5 +1,6 @@
 import { Geist, Geist_Mono, JetBrains_Mono } from "next/font/google"
 import type { Metadata } from "next"
+import Script from "next/script"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
@@ -48,6 +49,14 @@ export default function RootLayout({
         jetbrainsMono.variable
       )}
     >
+      <head>
+        <Script
+          data-website-id="dfid_OuELlIdHbyzXkCEpVa04o"
+          data-domain="outrankbid.vercel.app"
+          src="https://datafa.st/js/script.js"
+          strategy="afterInteractive"
+        />
+      </head>
       <body>
         <ThemeProvider>{children}</ThemeProvider>
       </body>
