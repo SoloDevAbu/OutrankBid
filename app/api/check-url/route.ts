@@ -19,9 +19,9 @@ function normalizeUrlOrigin(raw: string): string | null {
 /**
  * POST /api/check-url
  *
- * Checks whether a startup with the given websiteUrl already exists in the DB.
+ * Checks whether a startup with the given appUrl already exists in the DB.
  *
- * Request body:  { "websiteUrl": "https://example.com" }
+ * Request body:  { "appUrl": "https://example.com" }
  *
  * Response (exists):
  *   { "exists": true, "startupId": "uuid", "currentBidDollars": 50, "name": "Example" }
@@ -44,12 +44,12 @@ export async function POST(request: Request) {
     )
   }
 
-  const { websiteUrl } = body as { websiteUrl?: string }
+  const { appUrl } = body as { appUrl?: string }
 
-  const origin = normalizeUrlOrigin(websiteUrl ?? "")
+  const origin = normalizeUrlOrigin(appUrl ?? "")
   if (!origin) {
     return NextResponse.json(
-      { error: "`websiteUrl` must be a valid http/https URL" },
+      { error: "`appUrl` must be a valid http/https URL" },
       { status: 422 }
     )
   }
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
         currentBid: startups.currentBid,
       })
       .from(startups)
-      .where(eq(startups.websiteUrl, origin))
+      .where(eq(startups.appUrl, origin))
       .limit(1)
 
     if (rows.length === 0) {

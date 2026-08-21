@@ -34,7 +34,7 @@ beforeAll(async () => {
       categoryId,
       name: "__test_active__",
       slug: `__test_active_${Date.now()}__`,
-      websiteUrl: "https://test.example.com",
+      appUrl: "https://test.example.com",
       currentBid: 10000,
       status: "active",
     })
@@ -49,7 +49,7 @@ beforeAll(async () => {
       categoryId,
       name: "__test_paused__",
       slug: `__test_paused_${Date.now()}__`,
-      websiteUrl: "https://test-paused.example.com",
+      appUrl: "https://test-paused.example.com",
       currentBid: 5000,
       status: "paused",
     })

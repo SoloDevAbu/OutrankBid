@@ -4,7 +4,14 @@ import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
-import { MinusCircle, PlusCircle, ArrowRight, Loader2, AlertCircle, TrendingUp } from "lucide-react"
+import {
+  MinusCircle,
+  PlusCircle,
+  ArrowRight,
+  Loader2,
+  AlertCircle,
+  TrendingUp,
+} from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -33,7 +40,13 @@ function normalizeUrl(raw: string): string | null {
   try {
     const u = new URL(input)
     if (u.protocol !== "http:" && u.protocol !== "https:") return null
-    return u.origin
+    
+    const isAppStore = u.hostname === "apps.apple.com"
+    const isPlayStore = u.hostname === "play.google.com" && u.pathname.startsWith("/store/apps/details")
+
+    if (!isAppStore && !isPlayStore) return null
+
+    return u.href
   } catch {
     return null
   }
@@ -62,11 +75,16 @@ export function HomeHeroCta() {
   const [showNewListingDialog, setShowNewListingDialog] = useState(false)
   const [description, setDescription] = useState("")
   const [category, setCategory] = useState("")
-  const [categories, setCategories] = useState<{ id: string; name: string; slug: string }[]>([])
+  const [categories, setCategories] = useState<
+    { id: string; name: string; slug: string }[]
+  >([])
 
   // Top-up dialog
   const [showTopUpDialog, setShowTopUpDialog] = useState(false)
-  const [topUpResult, setTopUpResult] = useState<Extract<UrlCheckResult, { exists: true }> | null>(null)
+  const [topUpResult, setTopUpResult] = useState<Extract<
+    UrlCheckResult,
+    { exists: true }
+  > | null>(null)
 
   const [error, setError] = useState<string | null>(null)
 
@@ -115,7 +133,7 @@ export function HomeHeroCta() {
     setError(null)
     const normalized = normalizeUrl(website)
     if (!normalized) {
-      setError("Enter a valid website URL (e.g., example.com).")
+      setError("Enter a valid App Store or Google Play URL.")
       return
     }
 
@@ -124,7 +142,7 @@ export function HomeHeroCta() {
       const res = await fetch("/api/check-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ websiteUrl: normalized }),
+        body: JSON.stringify({ appUrl: normalized }),
       })
 
       if (!res.ok) {
@@ -173,7 +191,7 @@ export function HomeHeroCta() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amountCents,
-          websiteUrl: normalized,
+          appUrl: normalized,
           currency: "USD",
           description,
           categorySlug: category,
@@ -214,7 +232,7 @@ export function HomeHeroCta() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amountCents,
-          websiteUrl: normalized,
+          appUrl: normalized,
           currency: "USD",
           startupId: topUpResult.startupId,
           isTopUp: true,
@@ -246,14 +264,14 @@ export function HomeHeroCta() {
   return (
     <div className="flex flex-col justify-start">
       <h1 className="mb-3 text-2xl leading-[1.1] font-black tracking-tighter text-black lg:text-4xl">
-        YOUR STARTUP
+        YOUR APP
         <br />
         DESERVES THE
         <br />
         ATTENTION.
       </h1>
       <p className="mb-4 max-w-sm text-sm text-muted-foreground">
-        The internet's live leaderboard where startups compete for the top spot.
+        The internet's live leaderboard where apps compete for the top spot.
       </p>
       <Card className="mb-4 overflow-hidden rounded-sm border-2 border-orange-500 bg-white shadow-sm">
         <CardContent className="flex flex-col items-center justify-center p-2.5 text-center">
@@ -300,8 +318,8 @@ export function HomeHeroCta() {
           type="text"
           value={website}
           onChange={(e) => setWebsite(e.target.value)}
-          placeholder="Enter your startup URL..."
-          className="h-10 text-sm rounded-none border-r-0 bg-white focus-visible:ring-0 focus-visible:ring-offset-0"
+          placeholder="Enter your App Store or Google Play URL..."
+          className="h-10 rounded-none border-r-0 bg-white text-sm focus-visible:ring-0 focus-visible:ring-offset-0"
           onKeyDown={(e) => {
             if (e.key === "Enter" && website.trim()) {
               handleClaimClick()
@@ -327,7 +345,10 @@ export function HomeHeroCta() {
       </div>
 
       {error && (
-        <Alert variant="destructive" className="mt-4 border-red-500 bg-red-50 text-red-600 dark:bg-red-950/20">
+        <Alert
+          variant="destructive"
+          className="mt-4 border-red-500 bg-red-50 text-red-600 dark:bg-red-950/20"
+        >
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
@@ -337,17 +358,24 @@ export function HomeHeroCta() {
       {/* ------------------------------------------------------------------ */}
       {/* NEW LISTING DIALOG                                                   */}
       {/* ------------------------------------------------------------------ */}
-      <Dialog open={showNewListingDialog} onOpenChange={setShowNewListingDialog}>
+      <Dialog
+        open={showNewListingDialog}
+        onOpenChange={setShowNewListingDialog}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Complete your listing</DialogTitle>
             <DialogDescription>
-              Provide a short description and select a category so people know what your startup does.
+              Provide a short description and select a category so people know
+              what your app does.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <label htmlFor="description" className="text-sm font-medium leading-none">
+              <label
+                htmlFor="description"
+                className="text-sm leading-none font-medium"
+              >
                 Description
               </label>
               <Input
@@ -358,10 +386,13 @@ export function HomeHeroCta() {
               />
             </div>
             <div className="grid gap-2">
-              <label className="text-sm font-medium leading-none">
+              <label className="text-sm leading-none font-medium">
                 Category
               </label>
-              <Select value={category} onValueChange={(val) => setCategory(val || "")}>
+              <Select
+                value={category}
+                onValueChange={(val) => setCategory(val || "")}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
@@ -376,7 +407,10 @@ export function HomeHeroCta() {
             </div>
           </div>
           {error && (
-            <Alert variant="destructive" className="border-red-500 bg-red-50 text-red-600">
+            <Alert
+              variant="destructive"
+              className="border-red-500 bg-red-50 text-red-600"
+            >
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
@@ -422,7 +456,8 @@ export function HomeHeroCta() {
                   .
                 </span>
                 <span className="block text-sm">
-                  Add more funds below to increase your total bid and climb back to the top.
+                  Add more funds below to increase your total bid and climb back
+                  to the top.
                 </span>
               </span>
             </DialogDescription>
@@ -465,7 +500,10 @@ export function HomeHeroCta() {
           </div>
 
           {error && (
-            <Alert variant="destructive" className="border-red-500 bg-red-50 text-red-600">
+            <Alert
+              variant="destructive"
+              className="border-red-500 bg-red-50 text-red-600"
+            >
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>

@@ -33,10 +33,10 @@ export async function POST(request: Request) {
   if (name.length > 80)
     issues.push("`name` must be 80 characters or fewer.")
 
-  // -- websiteUrl ------------------------------------------------------------
-  const rawUrl = typeof raw.websiteUrl === "string" ? raw.websiteUrl.trim() : ""
+  // -- appUrl ------------------------------------------------------------
+  const rawUrl = typeof raw.appUrl === "string" ? raw.appUrl.trim() : ""
   if (!rawUrl)
-    issues.push("`websiteUrl` is required and must be a non-empty string.")
+    issues.push("`appUrl` is required and must be a non-empty string.")
 
   // -- categoryId ------------------------------------------------------------
   const categoryId =
@@ -66,9 +66,9 @@ export async function POST(request: Request) {
   }
 
   // -------------------------------------------------------------------------
-  // 3. Validate and normalise websiteUrl
+  // 3. Validate and normalise appUrl
   // -------------------------------------------------------------------------
-  const { url: websiteUrl, parseError } = normaliseUrl(rawUrl)
+  const { url: appUrl, parseError } = normaliseUrl(rawUrl)
   if (parseError) {
     return error(422, "Validation failed.", [parseError])
   }
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
       categoryId: category.id,
       name,
       slug,
-      websiteUrl: websiteUrl!,
+      appUrl: appUrl!,
       description: description ?? undefined,
       logoUrl: logoUrl ?? undefined,
       // currentBid defaults to 0 per schema; status defaults to "pending"
@@ -143,7 +143,7 @@ export async function POST(request: Request) {
         },
         currentBid: created.currentBid,
         currentBidFormatted: formatCents(created.currentBid),
-        websiteUrl: created.websiteUrl,
+        appUrl: created.appUrl,
         description: created.description,
         logoUrl: created.logoUrl,
         status: created.status,
@@ -189,13 +189,13 @@ function normaliseUrl(raw: string): { url: string | null; parseError: string | n
   try {
     parsed = new URL(input)
   } catch {
-    return { url: null, parseError: `\`websiteUrl\` "${raw}" is not a valid URL.` }
+    return { url: null, parseError: `\`appUrl\` "${raw}" is not a valid URL.` }
   }
 
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     return {
       url: null,
-      parseError: `\`websiteUrl\` must use http or https (got "${parsed.protocol}").`,
+      parseError: `\`appUrl\` must use http or https (got "${parsed.protocol}").`,
     }
   }
 

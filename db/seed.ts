@@ -89,7 +89,7 @@ async function main() {
       categorySlug: "ai",
       name: "VectorMind",
       slug: "vectormind",
-      websiteUrl: "https://vectormind.io",
+      appUrl: "https://vectormind.io",
       description:
         "The fastest vector search database built for production AI workloads.",
       currentBid: 100, // $450.00 in cents
@@ -99,7 +99,7 @@ async function main() {
       categorySlug: "developer-tools",
       name: "DeployKit",
       slug: "deploykit",
-      websiteUrl: "https://deploykit.dev",
+      appUrl: "https://deploykit.dev",
       description:
         "One-command deployments to any cloud, with zero config drift.",
       currentBid: 200, // $320.00
@@ -109,7 +109,7 @@ async function main() {
       categorySlug: "saas",
       name: "FormForge",
       slug: "formforge",
-      websiteUrl: "https://formforge.app",
+      appUrl: "https://formforge.app",
       description:
         "Build beautiful, conversion-optimised forms in minutes without code.",
       currentBid: 300, // $210.00
@@ -119,7 +119,7 @@ async function main() {
       categorySlug: "indie",
       name: "Snippetly",
       slug: "snippetly",
-      websiteUrl: "https://snippetly.dev",
+      appUrl: "https://snippetly.dev",
       description: "A private snippet manager for developers who hate clutter.",
       currentBid: 400, // $95.00
     },
@@ -128,7 +128,7 @@ async function main() {
       categorySlug: "startups",
       name: "LaunchLane",
       slug: "launchlane",
-      websiteUrl: "https://launchlane.co",
+      appUrl: "https://launchlane.co",
       description:
         "Curated early-access waitlist platform for pre-launch startups.",
       currentBid: 500, // $175.00
@@ -143,7 +143,7 @@ async function main() {
         categoryId: categoryMap[s.categorySlug],
         name: s.name,
         slug: s.slug,
-        websiteUrl: s.websiteUrl,
+        appUrl: s.appUrl,
         description: s.description,
         currentBid: s.currentBid,
         status: "active" as const,

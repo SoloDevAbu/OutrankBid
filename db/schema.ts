@@ -62,7 +62,7 @@ export const startups = pgTable(
       .references(() => categories.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
-    websiteUrl: text("website_url").notNull().unique(),
+    appUrl: text("app_url").notNull().unique(),
     description: text("description"),
     logoUrl: text("logo_url"),
 

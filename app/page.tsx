@@ -21,7 +21,7 @@ type LeaderboardEntry = {
   currentBid: number
   currentBidFormatted: string
   clickCount: number
-  websiteUrl: string
+  appUrl: string
   description: string | null
   logoUrl: string | null
   createdAt: string
@@ -83,23 +83,26 @@ export default function Page() {
   }, [])
 
   // Fetch leaderboard (re-runs when category filter changes)
-  const fetchLeaderboard = useCallback((categorySlug: string | null, isPolling = false) => {
-    if (!isPolling) setLoadingBoard(true)
-    const url = categorySlug
-      ? `/api/leaderboard?category=${categorySlug}`
-      : "/api/leaderboard"
-    fetch(url)
-      .then((r) => r.json())
-      .then((data) => {
-        setLeaderboard(data?.leaderboard ?? [])
-        setLastPullTime(Date.now())
-        setSecondsSincePull(0)
-      })
-      .catch(console.error)
-      .finally(() => {
-        if (!isPolling) setLoadingBoard(false)
-      })
-  }, [])
+  const fetchLeaderboard = useCallback(
+    (categorySlug: string | null, isPolling = false) => {
+      if (!isPolling) setLoadingBoard(true)
+      const url = categorySlug
+        ? `/api/leaderboard?category=${categorySlug}`
+        : "/api/leaderboard"
+      fetch(url)
+        .then((r) => r.json())
+        .then((data) => {
+          setLeaderboard(data?.leaderboard ?? [])
+          setLastPullTime(Date.now())
+          setSecondsSincePull(0)
+        })
+        .catch(console.error)
+        .finally(() => {
+          if (!isPolling) setLoadingBoard(false)
+        })
+    },
+    []
+  )
 
   useEffect(() => {
     fetchLeaderboard(activeCategory)
@@ -146,7 +149,7 @@ export default function Page() {
         <Link href="/" className="text-lg font-bold tracking-tight text-black">
           OutrankBid
         </Link>
-        <Link 
+        <Link
           href="/how-it-works"
           className="hidden text-[10px] font-semibold tracking-widest text-muted-foreground uppercase transition-colors hover:text-black md:block"
         >
@@ -205,7 +208,7 @@ export default function Page() {
 
           {/* Mini Leaderboard — top 3 from DB */}
           <div className="flex flex-col">
-            <Card className="rounded-sm bg-white shadow-sm border-black/10">
+            <Card className="rounded-sm border-black/10 bg-white shadow-sm">
               <div className="flex items-center justify-between border-b border-black/10 p-3">
                 <span className="text-[8px] font-black tracking-widest text-muted-foreground uppercase">
                   LEADERBOARD
@@ -243,7 +246,7 @@ export default function Page() {
                     {top3.map((entry, idx) => (
                       <a
                         key={entry.slug}
-                        href={entry.websiteUrl}
+                        href={entry.appUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => handleStartupClick(entry.slug)}
@@ -255,6 +258,9 @@ export default function Page() {
                           >
                             #{entry.rank}
                           </span>
+                          {entry.logoUrl && (
+                            <img src={entry.logoUrl} alt={`${entry.name} logo`} className="h-8 w-8 rounded-full object-cover" />
+                          )}
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="text-base font-bold text-black">
@@ -285,7 +291,9 @@ export default function Page() {
         <div className="mb-6 flex items-center">
           <Separator className="flex-1" />
           <div className="mx-4 flex items-center gap-2 text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
-            <span className="tabular-nums">LAST PULL {secondsSincePull}S AGO</span>
+            <span className="tabular-nums">
+              LAST PULL {secondsSincePull}S AGO
+            </span>
             <Button
               variant="outline"
               size="icon"
@@ -293,7 +301,9 @@ export default function Page() {
               onClick={() => fetchLeaderboard(activeCategory)}
               disabled={loadingBoard}
             >
-              <RefreshCw className={`h-3 w-3 ${loadingBoard ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`h-3 w-3 ${loadingBoard ? "animate-spin" : ""}`}
+              />
             </Button>
           </div>
           <Separator className="flex-1" />
@@ -376,7 +386,7 @@ export default function Page() {
             leaderboard.map((entry) => (
               <a
                 key={entry.slug}
-                href={entry.websiteUrl}
+                href={entry.appUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 id={`startup-${entry.slug}`}
@@ -389,6 +399,9 @@ export default function Page() {
                   >
                     #{entry.rank}
                   </span>
+                  {entry.logoUrl && (
+                    <img src={entry.logoUrl} alt={`${entry.name} logo`} className="h-12 w-12 rounded-full object-cover sm:h-14 sm:w-14" />
+                  )}
                   <div className="flex flex-col">
                     <div className="mb-1 flex flex-wrap items-center gap-2 sm:gap-3">
                       <span className="text-lg font-bold text-black">
@@ -410,7 +423,7 @@ export default function Page() {
                       </div>
                     </div>
                     <p className="text-xs font-medium text-muted-foreground">
-                      {entry.description ?? entry.websiteUrl}
+                      {entry.description ?? entry.appUrl}
                     </p>
                   </div>
                 </div>

@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server"
+import { db, startups, categories } from "@/db"
+import { eq } from "drizzle-orm"
+import { scrapeAppInfo } from "@/lib/scrape-app"
 
 type CreateCheckoutBody = {
   amountCents: number
-  websiteUrl: string
+  appUrl: string
   currency?: string // default: USD
   startupId?: string
   userId?: string
@@ -11,14 +14,20 @@ type CreateCheckoutBody = {
   isTopUp?: boolean // if true, amount is added on top of existing currentBid
 }
 
-function normalizeUrlOrigin(raw: string): string | null {
+function normalizeUrl(raw: string): string | null {
   let input = raw?.trim?.() ?? ""
   if (!input) return null
   if (!/^https?:\/\//i.test(input)) input = `https://${input}`
   try {
     const u = new URL(input)
     if (u.protocol !== "http:" && u.protocol !== "https:") return null
-    return u.origin
+    
+    const isAppStore = u.hostname === "apps.apple.com"
+    const isPlayStore = u.hostname === "play.google.com" && u.pathname.startsWith("/store/apps/details")
+
+    if (!isAppStore && !isPlayStore) return null
+
+    return u.href
   } catch {
     return null
   }
@@ -41,7 +50,7 @@ export async function POST(request: Request) {
 
   const {
     amountCents,
-    websiteUrl,
+    appUrl,
     currency: rawCurrency,
     startupId,
     userId,
@@ -57,12 +66,12 @@ export async function POST(request: Request) {
     )
   }
 
-  const origin = normalizeUrlOrigin(websiteUrl)
-  if (!origin) {
+  const normalizedHref = normalizeUrl(appUrl)
+  if (!normalizedHref) {
     return NextResponse.json(
       {
         error:
-          "`websiteUrl` must be a valid URL (http/https). Examples: example.com or https://example.com",
+          "`appUrl` must be a valid App Store or Google Play URL.",
       },
       { status: 422 }
     )
@@ -91,6 +100,89 @@ export async function POST(request: Request) {
     )
   }
 
+  let finalStartupId = startupId
+
+  // If this is a new listing, we create a pending startup
+  if (!isTopUp && !startupId) {
+    // We need category ID
+    let catId: string | null = null
+    if (categorySlug) {
+      const catRows = await db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(eq(categories.slug, categorySlug))
+        .limit(1)
+      if (catRows.length > 0) {
+        catId = catRows[0].id
+      }
+    }
+
+    if (!catId) {
+       // fallback to general if not found
+       const genRows = await db
+         .select({ id: categories.id })
+         .from(categories)
+         .where(eq(categories.slug, "general"))
+         .limit(1)
+       if (genRows.length > 0) catId = genRows[0].id
+    }
+
+    if (!catId) {
+      return NextResponse.json({ error: "Category not found" }, { status: 400 })
+    }
+
+    // Scrape app info
+    const scraped = await scrapeAppInfo(normalizedHref)
+    const appName = scraped.name || "Unknown App"
+    const logoUrl = scraped.logoUrl
+
+    // Base slug
+    const baseSlug = appName.toLowerCase().replace(/[^a-z0-9]+/g, "-")
+    const slug = `${baseSlug}-${Date.now().toString(36)}`
+
+    // Check if a pending one already exists for this URL
+    const existing = await db
+      .select({ id: startups.id, status: startups.status })
+      .from(startups)
+      .where(eq(startups.appUrl, normalizedHref))
+      .limit(1)
+
+    if (existing.length > 0) {
+      if (existing[0].status === "active") {
+        return NextResponse.json({ error: "App already exists. Please top up instead." }, { status: 400 })
+      }
+      // Update pending
+      await db.update(startups).set({
+        name: appName,
+        logoUrl: logoUrl,
+        description: description || null,
+        categoryId: catId,
+      }).where(eq(startups.id, existing[0].id))
+      finalStartupId = existing[0].id
+    } else {
+      // Insert new pending
+      const [newStartup] = await db
+        .insert(startups)
+        .values({
+          ownerId: userId || "anonymous",
+          categoryId: catId,
+          name: appName,
+          slug,
+          appUrl: normalizedHref,
+          description: description || null,
+          logoUrl,
+          currentBid: 0,
+          status: "pending",
+        })
+        .returning({ id: startups.id })
+      finalStartupId = newStartup.id
+    }
+  }
+
+  if (!finalStartupId) {
+    return NextResponse.json({ error: "Missing startupId" }, { status: 400 })
+  }
+
   // Build request body for Checkout Sessions via our /checkout (POST) handler (type: 'session').
   const checkoutBody = {
     product_cart: [
@@ -108,13 +200,8 @@ export async function POST(request: Request) {
       process.env.DODO_PAYMENTS_RETURN_URL ?? new URL(request.url).origin,
     // Custom metadata so we can stitch back on webhook
     metadata: {
-      website_url: origin,
-      ...(startupId ? { startup_id: startupId } : {}),
-      ...(userId ? { user_id: userId } : {}),
-      ...(description ? { description } : {}),
-      ...(categorySlug ? { category_slug: categorySlug } : {}),
+      startup_id: finalStartupId,
       is_top_up: isTopUp ? "true" : "false",
-      source: "home_hero",
       environment: process.env.DODO_PAYMENTS_ENVIRONMENT ?? "test_mode",
     },
   }
