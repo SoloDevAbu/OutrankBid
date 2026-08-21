@@ -11,18 +11,18 @@ const fontSans = Geist({
 })
 
 export const metadata: Metadata = {
-  title: "Startup Rank",
+  title: "OutrankBid",
   description:
     "The internet's live leaderboard where startups compete for the top spot.",
   openGraph: {
-    title: "Startup Rank",
+    title: "OutrankBid",
     description:
       "The internet's live leaderboard where startups compete for the top spot.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Startup Rank",
+    title: "OutrankBid",
     description:
       "The internet's live leaderboard where startups compete for the top spot.",
   },

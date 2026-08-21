@@ -96,6 +96,24 @@ export default function Page() {
     fetchLeaderboard(activeCategory)
   }, [activeCategory, fetchLeaderboard])
 
+  const handleStartupClick = (slug: string) => {
+    // Optimistically update UI
+    setLeaderboard((prev) =>
+      prev.map((entry) =>
+        entry.slug === slug
+          ? { ...entry, clickCount: entry.clickCount + 1 }
+          : entry
+      )
+    )
+
+    // Track click on the backend
+    fetch("/api/click", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug }),
+    }).catch(console.error)
+  }
+
   const top3 = leaderboard.slice(0, 3)
 
   return (
@@ -195,8 +213,12 @@ export default function Page() {
                 ) : (
                   <div className="flex flex-col">
                     {top3.map((entry, idx) => (
-                      <div
+                      <a
                         key={entry.slug}
+                        href={entry.websiteUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => handleStartupClick(entry.slug)}
                         className={`flex items-center justify-between p-3 transition-colors hover:bg-muted/50 ${idx < top3.length - 1 ? "border-b border-black/10" : ""}`}
                       >
                         <div className="flex items-center gap-3">
@@ -223,7 +245,7 @@ export default function Page() {
                         <span className="text-xl font-black text-orange-500">
                           {entry.currentBidFormatted}
                         </span>
-                      </div>
+                      </a>
                     ))}
                   </div>
                 )}
@@ -315,6 +337,7 @@ export default function Page() {
                 target="_blank"
                 rel="noopener noreferrer"
                 id={`startup-${entry.slug}`}
+                onClick={() => handleStartupClick(entry.slug)}
                 className="group -mx-4 flex flex-col justify-between rounded-lg border-b border-black/10 px-4 py-4 transition-colors hover:bg-black/5 sm:flex-row sm:items-center"
               >
                 <div className="flex items-start gap-4 sm:items-center sm:gap-6">
