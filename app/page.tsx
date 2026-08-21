@@ -101,8 +101,8 @@ export default function Page() {
   return (
     <div className="flex min-h-screen flex-col bg-[#fafafa] font-sans">
       {/* Header */}
-      <header className="flex items-center justify-between border-b bg-white px-6 py-3">
-        <div className="text-lg font-bold tracking-tight">OutrankBid</div>
+      <header className="flex items-center justify-between border-b border-black/10 bg-white px-6 py-3">
+        <div className="text-lg font-bold tracking-tight text-black">OutrankBid</div>
         <div className="hidden text-[10px] font-semibold tracking-widest text-muted-foreground uppercase md:block">
           How it works
         </div>
@@ -116,11 +116,11 @@ export default function Page() {
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-16 md:px-6">
         {/* Top Stats Pill */}
         <div className="mb-12 flex justify-center">
-          <div className="flex items-center gap-3 rounded-full border bg-white px-5 py-1.5 shadow-sm">
+          <div className="flex items-center gap-3 rounded-full border border-black/10 bg-white px-5 py-1.5 shadow-sm">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
               <div className="flex space-x-1">
-                <span className="text-xs leading-none font-bold">
+                <span className="text-xs leading-none font-bold text-black">
                   {loadingMeta ? (
                     <span className="inline-block h-3 w-6 animate-pulse rounded bg-muted" />
                   ) : (
@@ -136,7 +136,7 @@ export default function Page() {
             <div className="flex items-center gap-2">
               <Eye className="h-4 w-4 text-muted-foreground" />
               <div className="flex space-x-1">
-                <span className="text-xs leading-none font-bold">
+                <span className="text-xs leading-none font-bold text-black">
                   {loadingMeta ? (
                     <span className="inline-block h-3 w-8 animate-pulse rounded bg-muted" />
                   ) : (
@@ -159,8 +159,8 @@ export default function Page() {
 
           {/* Mini Leaderboard — top 3 from DB */}
           <div className="flex flex-col">
-            <Card className="rounded-sm bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b p-3">
+            <Card className="rounded-sm bg-white shadow-sm border-black/10">
+              <div className="flex items-center justify-between border-b border-black/10 p-3">
                 <span className="text-[8px] font-black tracking-widest text-muted-foreground uppercase">
                   LEADERBOARD
                 </span>
@@ -175,7 +175,7 @@ export default function Page() {
                     {[1, 2, 3].map((i) => (
                       <div
                         key={i}
-                        className="flex items-center justify-between border-b p-4 last:border-0"
+                        className="flex items-center justify-between border-b border-black/10 p-4 last:border-0"
                       >
                         <div className="flex items-center gap-4">
                           <span className="h-8 w-8 animate-pulse rounded bg-muted" />
@@ -197,7 +197,7 @@ export default function Page() {
                     {top3.map((entry, idx) => (
                       <div
                         key={entry.slug}
-                        className={`flex items-center justify-between p-3 transition-colors hover:bg-muted/50 ${idx < top3.length - 1 ? "border-b" : ""}`}
+                        className={`flex items-center justify-between p-3 transition-colors hover:bg-muted/50 ${idx < top3.length - 1 ? "border-b border-black/10" : ""}`}
                       >
                         <div className="flex items-center gap-3">
                           <span
@@ -288,7 +288,7 @@ export default function Page() {
             [1, 2, 3, 4, 5].map((i) => (
               <div
                 key={i}
-                className="-mx-4 flex items-center justify-between rounded-lg border-b px-4 py-4"
+                className="-mx-4 flex items-center justify-between rounded-lg border-b border-black/10 px-4 py-4"
               >
                 <div className="flex items-center gap-8">
                   <span className="h-8 w-10 animate-pulse rounded bg-muted" />
@@ -315,7 +315,7 @@ export default function Page() {
                 target="_blank"
                 rel="noopener noreferrer"
                 id={`startup-${entry.slug}`}
-                className="group -mx-4 flex flex-col justify-between rounded-lg border-b px-4 py-4 transition-colors hover:bg-black/5 sm:flex-row sm:items-center"
+                className="group -mx-4 flex flex-col justify-between rounded-lg border-b border-black/10 px-4 py-4 transition-colors hover:bg-black/5 sm:flex-row sm:items-center"
               >
                 <div className="flex items-start gap-4 sm:items-center sm:gap-6">
                   <span
@@ -358,7 +358,7 @@ export default function Page() {
       </main>
 
       {/* Footer */}
-      <footer className="flex flex-col items-center justify-between border-t bg-[#f5f5f5] px-6 py-8 md:flex-row">
+      <footer className="flex flex-col items-center justify-between border-t border-black/10 bg-[#f5f5f5] px-6 py-8 md:flex-row">
         <div className="mb-4 text-base font-bold tracking-tight text-black md:mb-0">
           OutrankBid
         </div>
